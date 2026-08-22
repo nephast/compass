@@ -1,0 +1,33 @@
+version: "3.9"
+
+# Local dev stack — see docs/runbooks/local-development.md (write during Epic 0).
+# LocalStack mocks the AWS services the ingestion pipeline needs (S3, SQS,
+# EventBridge, Step Functions, Lambda) so you're not burning real AWS calls
+# or budget just to iterate on handler logic.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: compass
+      POSTGRES_PASSWORD: compass
+      POSTGRES_DB: compass
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  localstack:
+    image: localstack/localstack:3
+    environment:
+      SERVICES: s3,sqs,events,stepfunctions,lambda,secretsmanager
+      DEBUG: 0
+      PERSISTENCE: 1
+    ports:
+      - "4566:4566"
+    volumes:
+      - localstack-data:/var/lib/localstack
+
+volumes:
+  pgdata:
+  localstack-data:

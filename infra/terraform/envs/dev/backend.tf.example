@@ -1,0 +1,15 @@
+# Rename to backend.tf once the state bucket + lock table exist (see
+# infra/terraform/README.md — bootstrap step). Fill in real values; this file
+# is intentionally an .example so a real backend config with your account's
+# bucket name never accidentally gets committed with placeholder values that
+# look real.
+
+terraform {
+  backend "s3" {
+    bucket         = "compass-tfstate-CHANGE-ME"
+    key            = "dev/terraform.tfstate"
+    region         = "eu-west-1"
+    dynamodb_table = "compass-tfstate-lock"
+    encrypt        = true
+  }
+}

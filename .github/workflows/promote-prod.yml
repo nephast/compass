@@ -1,0 +1,44 @@
+name: Promote to prod
+
+# Manually triggered only, and gated behind the "prod" GitHub Environment's
+# required reviewers (configure this in repo Settings → Environments once
+# you're ready for it — part of COMPASS-27). Deploys a specific, already-
+# built image tag from dev to prod. Nothing here builds new artifacts —
+# promotion means running the exact thing that passed in dev, not rebuilding.
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Git SHA (image tag) to promote from dev, already verified there"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  promote:
+    name: Deploy verified image to prod
+    runs-on: ubuntu-latest
+    if: false # TODO: flip on once dev is stable and you're ready to stand up a second env
+    environment: prod # requires manual approval — configure required reviewers on this environment
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_CI_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - run: aws eks update-kubeconfig --name compass-prod --region ${{ vars.AWS_REGION }}
+      - name: Roll out the already-verified image
+        run: |
+          kubectl set image deployment/api api=$ECR_REGISTRY/compass-api:${{ inputs.image_tag }} -n compass
+          kubectl set image deployment/agent-tools agent-tools=$ECR_REGISTRY/compass-agent-tools:${{ inputs.image_tag }} -n compass
+          kubectl rollout status deployment/api -n compass --timeout=120s
+          kubectl rollout status deployment/agent-tools -n compass --timeout=120s
+        env:
+          ECR_REGISTRY: ${{ vars.ECR_REGISTRY }}
+      - name: Smoke test prod
+        run: ./scripts/smoke-test.sh prod

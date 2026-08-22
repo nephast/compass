@@ -1,0 +1,43 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# env — never commit real secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# build output
+dist/
+build/
+.next/
+out/
+cdk.out/
+*.tsbuildinfo
+
+# terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terraform.lock.hcl
+
+# logs
+*.log
+npm-debug.log*
+
+# OS/editor
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# test/coverage
+coverage/
+
+# LocalStack
+.localstack/
+volume/

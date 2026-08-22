@@ -1,0 +1,94 @@
+name: Deploy to dev
+
+# Runs automatically on every merge to main. This is the "fast lane" — no
+# human approval, because dev is meant to be broken sometimes. prod is a
+# separate, gated workflow (promote-prod.yml).
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write # OIDC to AWS, no static keys in GitHub Secrets
+
+jobs:
+  build-and-push:
+    name: Build & push images to ECR
+    runs-on: ubuntu-latest
+    if: false # TODO (COMPASS-26): flip on once Dockerfiles exist for api/agent-tools
+    strategy:
+      matrix:
+        service: [api, agent-tools]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_CI_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Build & push
+        run: |
+          IMAGE_TAG=${{ github.sha }}
+          docker build -t $ECR_REGISTRY/compass-${{ matrix.service }}:$IMAGE_TAG \
+            -f apps/${{ matrix.service }}/Dockerfile apps/${{ matrix.service }}
+          docker push $ECR_REGISTRY/compass-${{ matrix.service }}:$IMAGE_TAG
+        env:
+          ECR_REGISTRY: ${{ vars.ECR_REGISTRY }}
+
+  deploy-cdk-dev:
+    name: Deploy CDK stacks to dev
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: false # TODO (COMPASS-9+): flip on once stacks exist
+    environment: dev
+    defaults:
+      run:
+        working-directory: infra/cdk
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_CI_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - run: npx cdk deploy --all --require-approval never --context env=dev
+
+  deploy-k8s-dev:
+    name: Roll out api/agent-tools to EKS (dev)
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: false # TODO (COMPASS-17): flip on once k8s manifests/helm chart exist
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_CI_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - run: aws eks update-kubeconfig --name compass-dev --region ${{ vars.AWS_REGION }}
+      - name: Update image tags and apply
+        run: |
+          kubectl set image deployment/api api=$ECR_REGISTRY/compass-api:${{ github.sha }} -n compass
+          kubectl set image deployment/agent-tools agent-tools=$ECR_REGISTRY/compass-agent-tools:${{ github.sha }} -n compass
+          kubectl rollout status deployment/api -n compass --timeout=120s
+          kubectl rollout status deployment/agent-tools -n compass --timeout=120s
+        env:
+          ECR_REGISTRY: ${{ vars.ECR_REGISTRY }}
+
+  smoke-test:
+    name: Post-deploy smoke test
+    runs-on: ubuntu-latest
+    needs: [deploy-cdk-dev, deploy-k8s-dev]
+    if: false # TODO (COMPASS-28): flip on once there's something to smoke-test
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/smoke-test.sh dev

@@ -1,0 +1,84 @@
+name: Infra plan (Terraform + CDK diff)
+
+# Posts a plan/diff as a PR comment for any infra change — the same
+# discipline a real platform team would require before touching prod-adjacent
+# infra. Nothing here applies changes; that only happens in deploy.yml /
+# promote-prod.yml, gated by environment approval.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "infra/**"
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write # for OIDC auth to AWS — see docs/runbooks/ci-aws-auth.md
+
+jobs:
+  terraform-plan:
+    name: terraform plan (per env)
+    runs-on: ubuntu-latest
+    if: false # TODO (COMPASS-5+): flip on once infra/terraform/envs/dev has real config + backend
+    strategy:
+      matrix:
+        env: [dev]
+    defaults:
+      run:
+        working-directory: infra/terraform/envs/${{ matrix.env }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - name: Configure AWS credentials (OIDC — no long-lived keys)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_CI_ROLE_ARN }} # TODO: create via Terraform, least-privilege
+          aws-region: ${{ vars.AWS_REGION }}
+      - run: terraform init
+      - run: terraform plan -no-color -out=tfplan | tee plan.txt
+      - name: Comment plan on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('infra/terraform/envs/${{ matrix.env }}/plan.txt', 'utf8').slice(0, 60000);
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `### Terraform plan — ${{ matrix.env }}\n\n\`\`\`\n${plan}\n\`\`\``
+            });
+
+  cdk-diff:
+    name: cdk diff
+    runs-on: ubuntu-latest
+    if: false # TODO (COMPASS-9+): flip on once infra/cdk has real stacks
+    defaults:
+      run:
+        working-directory: infra/cdk
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_CI_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - run: npx cdk diff --all > diff.txt || true
+      - name: Comment diff on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const diff = fs.readFileSync('infra/cdk/diff.txt', 'utf8').slice(0, 60000);
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `### CDK diff\n\n\`\`\`\n${diff}\n\`\`\``
+            });
