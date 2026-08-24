@@ -18,3 +18,5 @@ Yes, even solo. The reason: a clean conventional-commit history is what lets `gi
 ## Reviewing your own PRs
 
 Before merging, read your own diff as if reviewing a stranger's code: does it match the ticket's acceptance criteria in `docs/PROGRAM.md`? Did you leave a `console.log`? Does an IAM policy have a wildcard you didn't mean to leave in? Is there a magic number that should be a named constant? This habit transfers directly to real-job code review.
+
+hello
