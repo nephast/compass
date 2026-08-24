@@ -1,0 +1,35 @@
+name: PR title
+
+# The PR title becomes the squash-merge commit message (see repo merge
+# settings + CONTRIBUTING.md), so this is what actually gets enforced —
+# not individual commits on the branch, which can be as messy as you like.
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+    branches: [main]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  lint-pr-title:
+    name: Conventional commit format (PR title)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@0723387faaf9b38adef4775cd42cfd5155ed6017  # SHA for v5.5.3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            chore
+            docs
+            test
+            refactor
+            ci
+            perf
+            security
+            revert
+          requireScope: false

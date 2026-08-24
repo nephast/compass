@@ -12,15 +12,6 @@ permissions:
   pull-requests: write # for the commitlint / diff comments below
 
 jobs:
-  conventional-commits:
-    name: Conventional commit messages
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: wagoid/commitlint-github-action@v6
-
   lint-typecheck-test:
     name: Lint, typecheck, unit tests
     runs-on: ubuntu-latest
@@ -28,7 +19,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
       - run: npm ci
       - run: npm run lint
@@ -43,7 +34,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
       - run: npm ci
       - run: npm audit --audit-level=high
@@ -60,7 +51,7 @@ jobs:
       - name: Build image
         run: docker build -t compass-${{ matrix.service }}:pr -f apps/${{ matrix.service }}/Dockerfile apps/${{ matrix.service }}
       - name: Scan with Trivy
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1  # v0.35.0 — pinned, see docs/runbooks/security-baseline.md
         with:
           image-ref: compass-${{ matrix.service }}:pr
           severity: CRITICAL,HIGH
@@ -73,10 +64,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: tfsec
-        uses: aquasecurity/tfsec-action@v1.0.3
+        uses: aquasecurity/tfsec-action@b466648d6e39e7c75324f25d83891162a721f2d6 # SHA for v1.0.3
         with:
           working_directory: infra/terraform
       - name: checkov
-        uses: bridgecrewio/checkov-action@v12
+        uses: bridgecrewio/checkov-action@8c07e78c64ddc2209d8c193a4e321aad67677f8d # SHA for v12.999.0
         with:
           directory: infra/terraform
