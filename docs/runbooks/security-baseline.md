@@ -28,3 +28,7 @@ that touches IAM, networking, or data.
 - [ ] JWT validated on every request that needs auth, at the API Gateway authorizer, not trusted from a header.
 - [ ] Agent tool calls validated against an explicit allow-list, arguments schema-validated before execution (COMPASS-22).
 - [ ] Dependency scanning (`npm audit`) and container scanning (Trivy) both failing CI on high/critical findings, not just reporting.
+
+## CI
+
+- [ ] Third-party GitHub Actions pinned to full commit SHA, not floating tags — see CVE-2026-33634 (Trivy supply-chain compromise, March 2026).

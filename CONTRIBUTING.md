@@ -6,12 +6,8 @@ This repo enforces trunk-based development even though it's a solo project, on p
 
 1. Branch off `main`: `git checkout -b feat/compass-19-llm-provider-abstraction` (prefix with the ticket ID from `docs/PROGRAM.md`).
 2. Keep the PR small — one ticket, or a clean slice of one, ideally reviewable in under 15 minutes. If a ticket feels too big for one PR, that's a signal to split it, not to write a bigger PR.
-3. Commit using **Conventional Commits** (enforced by CI — see `.github/workflows/pr-checks.yml`):
-   - `feat(ingestion): add idempotent chunk storage (COMPASS-12)`
-   - `fix(api): correct HPA target CPU threshold`
-   - `chore(infra): bump terraform aws provider`
-   - `docs(adr): add ADR-0004 for prompt versioning`
-   - Types: `feat`, `fix`, `chore`, `docs`, `test`, `refactor`, `ci`, `perf`, `security`.
+3. PR title using **Conventional Commits** (enforced by CI — see `.github/workflows/pr-title.yml`):
+  individual commits on a branch can be whatever gets you through the work (wip, fix typo, etc.) — only the PR title needs to follow Conventional Commits format, since that's what lands permanently on main
 4. Open the PR against `main`. CI runs lint, typecheck, tests, security scans, and (for infra changes) posts a `terraform plan` / `cdk diff` as a comment.
 5. Merge only when CI is green. Merging to `main` auto-deploys to `dev` (see `.github/workflows/deploy.yml`); promotion to `prod` needs a manual approval click in GitHub Environments.
 
