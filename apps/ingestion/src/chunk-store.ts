@@ -45,7 +45,11 @@ function placeholderEmbedding(): string {
 // ON CONFLICT keeps re-processing the same object idempotent (COMPASS-12
 // also covers replayed SQS messages, not applicable to this direct-invoke
 // scaffold).
-export async function storeObjectAsChunk(bucket: string, key: string, content: string): Promise<void> {
+export async function storeObjectAsChunk(
+  bucket: string,
+  key: string,
+  content: string,
+): Promise<void> {
   await ensureSchema();
   await pool.query(
     `INSERT INTO chunks (bucket, object_key, content, embedding)

@@ -23,6 +23,14 @@ export default [
     },
   },
   {
+    // The structured logger is the one place console is the transport, not a
+    // debugging leftover — everything else routes through it (COMPASS-29).
+    files: ["**/logger.ts"],
+    rules: {
+      "no-console": "off",
+    },
+  },
+  {
     ignores: ["**/node_modules/**", "**/dist/**", "**/cdk.out/**", "**/.next/**"],
   },
 ];

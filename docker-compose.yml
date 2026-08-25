@@ -11,9 +11,16 @@ services:
       POSTGRES_PASSWORD: compass
       POSTGRES_DB: compass
     ports:
-      - '5432:5432'
+      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # `npm run local:up` uses `docker compose up -d --wait`, so bootstrap
+      # and tests never race a database that isn't accepting connections yet.
+      test: ["CMD-SHELL", "pg_isready -U compass -d compass"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
 
   localstack:
     image: localstack/localstack:3
@@ -21,13 +28,18 @@ services:
       SERVICES: s3,sqs,events,stepfunctions,lambda,secretsmanager,logs
       DEBUG: 0
     ports:
-      - '4566:4566'
+      - "4566:4566"
     volumes:
       - localstack-data:/var/lib/localstack
       # Lambda execution spins up runtime containers via the host's Docker
       # daemon -- without this mount, CreateFunction succeeds but Invoke
       # (including S3 notification-triggered invokes) never runs.
       - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:4566/_localstack/health"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
 
 volumes:
   pgdata:
