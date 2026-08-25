@@ -18,10 +18,15 @@
     "dev": "echo 'TODO (COMPASS-4): wire this to docker compose + your service of choice'"
   },
   "devDependencies": {
+    "@types/node": "^24.0.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "eslint": "^10.0.0",
     "prettier": "^3.3.0",
     "typescript": "^5.5.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "fsevents@2.3.3": true
   }
 }

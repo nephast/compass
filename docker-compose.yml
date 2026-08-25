@@ -1,5 +1,3 @@
-version: "3.9"
-
 # Local dev stack — see docs/runbooks/local-development.md (write during Epic 0).
 # LocalStack mocks the AWS services the ingestion pipeline needs (S3, SQS,
 # EventBridge, Step Functions, Lambda) so you're not burning real AWS calls
@@ -13,20 +11,23 @@ services:
       POSTGRES_PASSWORD: compass
       POSTGRES_DB: compass
     ports:
-      - "5432:5432"
+      - '5432:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
 
   localstack:
     image: localstack/localstack:3
     environment:
-      SERVICES: s3,sqs,events,stepfunctions,lambda,secretsmanager
+      SERVICES: s3,sqs,events,stepfunctions,lambda,secretsmanager,logs
       DEBUG: 0
-      PERSISTENCE: 1
     ports:
-      - "4566:4566"
+      - '4566:4566'
     volumes:
       - localstack-data:/var/lib/localstack
+      # Lambda execution spins up runtime containers via the host's Docker
+      # daemon -- without this mount, CreateFunction succeeds but Invoke
+      # (including S3 notification-triggered invokes) never runs.
+      - /var/run/docker.sock:/var/run/docker.sock
 
 volumes:
   pgdata:
