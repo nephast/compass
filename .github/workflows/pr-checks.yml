@@ -24,8 +24,11 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
-      - run: npm run test -- --coverage
-      # TODO (COMPASS-25): upload coverage as a PR comment or artifact
+      - run: npm run test
+      # Unit tier only — test:integration and test:wiring need LocalStack and
+      # Postgres. TODO (COMPASS-25): add service containers so they run here
+      # too, plus coverage reporting (the old `-- --coverage` flag never
+      # reached vitest through the workspace fan-out).
 
   dependency-audit:
     name: npm audit (fail on high/critical)
