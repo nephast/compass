@@ -25,7 +25,7 @@ jobs:
     if: false # TODO: flip on once dev is stable and you're ready to stand up a second env
     environment: prod # requires manual approval — configure required reviewers on this environment
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # SHA for v4.3.1
         with:

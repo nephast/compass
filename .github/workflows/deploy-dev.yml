@@ -21,7 +21,7 @@ jobs:
       matrix:
         service: [api, agent-tools]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # SHA for v4.3.1
         with:
@@ -48,7 +48,7 @@ jobs:
       run:
         working-directory: infra/cdk
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -68,7 +68,7 @@ jobs:
     if: false # TODO (COMPASS-17): flip on once k8s manifests/helm chart exist
     environment: dev
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # SHA for v4.3.1
         with:
@@ -90,5 +90,5 @@ jobs:
     needs: [deploy-cdk-dev, deploy-k8s-dev]
     if: false # TODO (COMPASS-28): flip on once there's something to smoke-test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - run: ./scripts/smoke-test.sh dev
