@@ -2,6 +2,8 @@
 
 COMPASS-<!-- number -->
 
+Closes #<!-- issue -->
+
 ## What changed
 
 <!-- One or two sentences. -->
