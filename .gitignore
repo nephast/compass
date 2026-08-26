@@ -23,7 +23,10 @@ cdk.out/
 *.tfstate.*
 *.tfvars
 !*.tfvars.example
-.terraform.lock.hcl
+# NB: .terraform.lock.hcl is deliberately NOT ignored — it pins provider
+# versions + checksums and must be committed (same reasoning as package-lock.json).
+backend.tf
+tfplan
 
 # logs
 *.log
