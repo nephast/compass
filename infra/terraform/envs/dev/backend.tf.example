@@ -1,15 +1,17 @@
-# Rename to backend.tf once the state bucket + lock table exist (see
-# infra/terraform/README.md — bootstrap step). Fill in real values; this file
-# is intentionally an .example so a real backend config with your account's
-# bucket name never accidentally gets committed with placeholder values that
-# look real.
+# Copy to backend.tf once the state bucket exists (see
+# docs/runbooks/terraform-bootstrap.md). backend.tf is gitignored so a real
+# bucket name never lands in this public repo; this .example is the shape.
+#
+# use_lockfile = true uses S3 conditional writes for state locking
+# (Terraform >= 1.11), so no DynamoDB lock table is needed. See ADR note in
+# infra/terraform/README.md.
 
 terraform {
   backend "s3" {
-    bucket         = "compass-tfstate-CHANGE-ME"
-    key            = "dev/terraform.tfstate"
-    region         = "eu-west-1"
-    dynamodb_table = "compass-tfstate-lock"
-    encrypt        = true
+    bucket       = "compass-tfstate-CHANGE-ME"
+    key          = "dev/terraform.tfstate"
+    region       = "eu-west-1"
+    encrypt      = true
+    use_lockfile = true
   }
 }
