@@ -152,9 +152,13 @@ resource "aws_route_table_association" "private_b" {
 # --- NAT instance ------------------------------------------------------------
 
 # Resolved from AWS's published parameter, never hardcoded — AMI IDs rotate
-# as AWS patches them, and t4g needs arm64 specifically (Graviton).
-data "aws_ssm_parameter" "al2023_arm64" {
-  name = "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64"
+# as AWS patches them. x86_64, not arm64/t4g: this account has AWS's
+# "Free Tier eligible instance types only" guardrail on, which t4g.nano
+# fails (InvalidParameterCombination on RunInstances). ADR-0001 already
+# anticipated this ("t4g.nano is ~$3/mo, or free-tier eligible depending on
+# instance type/region") — t3.micro is free-tier eligible and $0/mo here.
+data "aws_ssm_parameter" "al2023_x86_64" {
+  name = "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"
 }
 
 resource "aws_security_group" "nat" {
@@ -175,8 +179,8 @@ resource "aws_security_group" "nat" {
 }
 
 resource "aws_instance" "nat" {
-  ami                    = data.aws_ssm_parameter.al2023_arm64.value
-  instance_type          = "t4g.nano"
+  ami                    = data.aws_ssm_parameter.al2023_x86_64.value
+  instance_type          = "t3.micro"
   subnet_id              = aws_subnet.public_a.id
   vpc_security_group_ids = [aws_security_group.nat.id]
 
