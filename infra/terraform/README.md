@@ -13,14 +13,32 @@ which only plans; there is deliberately no `terraform apply` in CI for this repo
 
 ## State
 
-Use an S3 backend + DynamoDB lock table (bootstrap these two resources manually,
-once, before anything else — they can't be created by the Terraform they'll
-store state for). Document the bootstrap steps in `docs/runbooks/terraform-bootstrap.md`
-once you've done it for real.
+Use an S3 backend with native state locking (`use_lockfile = true`, Terraform
+>= 1.11) — **no DynamoDB lock table**. Bootstrap the bucket manually, once,
+before anything else: it can't be created by the Terraform that will store its
+state in it. Steps: `docs/runbooks/terraform-bootstrap.md`.
+
+`envs/*/backend.tf` is gitignored so the real bucket name stays out of this
+public repo; `backend.tf.example` is the committed shape. That has a
+consequence for CI: **a workflow running `terraform init` gets no backend
+block**, silently falls back to a local backend, and plans against empty state —
+producing a confident "everything will be created" diff for infrastructure that
+already exists. Any CI job that plans must pass the config explicitly:
+
+```bash
+terraform init \
+  -backend-config="bucket=${TF_STATE_BUCKET}" \
+  -backend-config="key=dev/terraform.tfstate" \
+  -backend-config="region=${AWS_REGION}" \
+  -backend-config="use_lockfile=true"
+```
+
+with `TF_STATE_BUCKET` as a GitHub repository variable. Do this in the PR that
+flips `terraform-plan` off `if: false` in `.github/workflows/infra-plan.yml`.
 
 ## TODO
 
-- [ ] Bootstrap S3 state bucket + DynamoDB lock table (COMPASS-5, one-time, manual)
+- [x] Bootstrap S3 state bucket (COMPASS-5, one-time, manual — done; no lock table, native S3 locking)
 - [ ] `modules/vpc/` — see ADR-0001 for exactly what to build
 - [ ] `modules/eks/` — see ADR-0003
 - [ ] `envs/dev/main.tf` — wire the modules together, write outputs to SSM Parameter Store for CDK to read
