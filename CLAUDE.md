@@ -10,7 +10,7 @@ Because it is a learning project, the intended mode of work is *mentoring, not g
 
 ## Ticket tracking
 
-Tickets live on **GitHub Project #2, "Compass Build Program"** (https://github.com/users/nephast/projects/2), backed by issues in this repo — `COMPASS-1` … `COMPASS-38` map to issues **#6 … #43** in order (`COMPASS-N` = issue `N + 5`). Each issue carries its acceptance criteria verbatim from `docs/PROGRAM.md`.
+Tickets live on **GitHub Project #2, "Compass Build Program"** (https://github.com/users/nephast/projects/2), backed by issues in this repo. `COMPASS-1` … `COMPASS-38` map to issues **#6 … #43** in order (`COMPASS-N` = issue `N + 5`), but **that arithmetic holds only for those original 38** — GitHub draws issues and pull requests from a single number sequence, so every merged PR shifts it. COMPASS-39 is issue **#46**, not #44. Look any later ticket up (`gh issue list --search "COMPASS-39"`); never compute it. Each issue carries its acceptance criteria verbatim from `docs/PROGRAM.md`.
 
 The board is the source of truth for **what's done**; `docs/PROGRAM.md` is the source of truth for **what each ticket means** — read the epic's "why it matters" preamble there before starting, not just the issue.
 
