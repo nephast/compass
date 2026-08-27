@@ -16,7 +16,7 @@ jobs:
     name: Lint, typecheck, unit tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -34,7 +34,7 @@ jobs:
     name: npm audit (fail on high/critical)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -50,7 +50,7 @@ jobs:
       matrix:
         service: [api, agent-tools]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Build image
         run: docker build -t compass-${{ matrix.service }}:pr -f apps/${{ matrix.service }}/Dockerfile apps/${{ matrix.service }}
       - name: Scan with Trivy
@@ -63,14 +63,19 @@ jobs:
   terraform-security:
     name: tfsec + checkov (Terraform)
     runs-on: ubuntu-latest
-    if: false # TODO (COMPASS-25): flip on once infra/terraform has real modules to scan
+    # Flipped on for COMPASS-5: infra/terraform/modules/vpc has real resources
+    # to scan now (a security group, an EC2 instance). continue-on-error on
+    # both steps because COMPASS-25 still owes real failure thresholds and
+    # the explanatory PR comment — this is early signal, not enforcement.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: tfsec
         uses: aquasecurity/tfsec-action@b466648d6e39e7c75324f25d83891162a721f2d6 # SHA for v1.0.3
+        continue-on-error: true
         with:
           working_directory: infra/terraform
       - name: checkov
         uses: bridgecrewio/checkov-action@8c07e78c64ddc2209d8c193a4e321aad67677f8d # SHA for v12.999.0
+        continue-on-error: true
         with:
           directory: infra/terraform

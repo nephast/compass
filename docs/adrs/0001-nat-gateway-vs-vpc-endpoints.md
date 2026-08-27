@@ -62,6 +62,42 @@ This is a cost-vs-realism trade-off, not a correctness one. In a production syst
 ## Action Items
 
 1. [ ] Terraform: VPC module — S3 Gateway endpoint (free), Interface endpoints for ECR API, ECR DKR, CloudWatch Logs, Secrets Manager (single AZ).
-2. [ ] Terraform: single NAT instance (t4g.nano) in the public subnet, security group locked to private subnet CIDRs only, source/dest check disabled.
-3. [ ] Route tables: private subnets route 0.0.0.0/0 to the NAT instance ENI.
+2. [x] Terraform: single NAT instance (t3.micro, not t4g.nano — see Amendment) in the public subnet, security group locked to private subnet CIDRs only, source/dest check disabled.
+3. [x] Route tables: private subnets route 0.0.0.0/0 to the NAT instance ENI.
 4. [ ] Document in `scripts/teardown.sh` that the NAT instance must be terminated, not just stopped, to avoid EBS storage charges.
+
+## Amendment (2026-08-26)
+
+**COMPASS-5 shipped the NAT instance and S3 gateway endpoint only.** Two
+deviations from the original decision, both cost-driven, both leaving the
+core decision (no NAT Gateway) intact:
+
+**1. Interface endpoints deferred to COMPASS-6.** Action Item 1's four
+interface endpoints (ECR API, ECR DKR, CloudWatch Logs, Secrets Manager)
+would cost ~$0.011/hr each ≈ **$32/mo in eu-west-1** — the same figure this
+ADR rejected a NAT Gateway over — while the NAT instance already provides
+that egress path. Deferring costs nothing functionally: the NAT instance
+already reaches ECR/Logs/Secrets Manager today; endpoints only buy traffic
+staying off the public internet and lower data-transfer cost, not access.
+They also can't be meaningfully tested yet — proving one works means
+removing the NAT route and watching an ECR pull still succeed, which needs
+the EKS nodes COMPASS-6 creates. **Revisit trigger:** once COMPASS-6's nodes
+exist, add the endpoints and prove each one by pulling the NAT route.
+
+**2. NAT instance is `t3.micro`, not `t4g.nano`.** This AWS account has the
+"Free Tier eligible instance types only" guardrail on; `t4g.nano` (arm64,
+Graviton) is not free-tier eligible in `eu-west-1` and was rejected outright
+by `RunInstances` (`InvalidParameterCombination`). This ADR's own cost table
+(Option C) already anticipated the possibility — "`t4g.nano` is ~$3/mo, **or
+free-tier eligible depending on instance type/region**." `t3.micro` (x86_64)
+is free-tier eligible: **$0/mo** instead of ~$3/mo, strictly better on cost,
+at the expense of x86_64 rather than Graviton (irrelevant to this instance's
+job — it only forwards packets, runs no application code).
+
+**Acceptance proven 2026-08-26:** `terraform plan` clean against the fully
+instantiated module (19/19 resources). A private-subnet test instance,
+reached only via SSM Session Manager (no public IP, confirmed via
+`describe-instances`), reached S3 through the gateway endpoint and ECR
+through the NAT path — both real HTTP responses, not timeouts. Test
+instance and its throwaway IAM role were deleted immediately after; neither
+was ever part of Terraform state.
