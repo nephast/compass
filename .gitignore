@@ -44,3 +44,6 @@ coverage/
 # LocalStack
 .localstack/
 volume/
+
+# RDS CA bundles, downloaded on demand from truststore.pki.rds.amazonaws.com
+*-bundle.pem
