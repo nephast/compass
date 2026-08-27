@@ -11,3 +11,11 @@ module "vpc" {
   env = var.env
   azs = slice(data.aws_availability_zones.available.names, 0, 2)
 }
+
+module "rds" {
+  source = "../../modules/rds"
+
+  env        = var.env
+  vpc_id     = module.vpc.vpc_id
+  subnet_ids = module.vpc.private_subnet_ids
+}
