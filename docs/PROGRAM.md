@@ -4,7 +4,7 @@ A 2-week, half-day-sessions curriculum for building Compass end to end: general 
 
 ## How to use this
 
-**No rigid day numbers.** Milestones are grouped into **epics**, each broken into **tickets** (`COMPASS-1`, `COMPASS-2`, …) sized to roughly one sitting each — small enough to start and finish in a single ADHD-friendly focus block, not "spend a whole day on vague thing." Work epics roughly in order (later ones depend on earlier ones) but pace yourself within an epic however your energy that day allows. Each epic has a rough session estimate as a sanity check, not a deadline.
+**No rigid day numbers.** Milestones are grouped into **epics**, each broken into **tickets** (`COMPASS-1`, `COMPASS-2`, …) sized to roughly one sitting each — small enough to start and finish in a single focus block, not "spend a whole day on vague thing." Work epics roughly in order (later ones depend on earlier ones) but pace yourself within an epic however your energy that day allows. Each epic has a rough session estimate as a sanity check, not a deadline.
 
 **Every epic is tagged CORE or STRETCH.** CORE is the spine of the portfolio piece — if you only get through CORE work in two weeks, you still have a complete, coherent, defensible system. STRETCH is where the deeper flexes live (tracing, WAF, semantic-release, mock EKS chaos testing). Do stretch work only after the current epic's CORE tickets are done, and feel free to skip straight past stretch items you're not enjoying — an abandoned stretch ticket costs you nothing; an unfinished CORE epic costs you the whole story.
 
