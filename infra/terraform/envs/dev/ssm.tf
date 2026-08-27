@@ -6,8 +6,18 @@
 # Keeping every published parameter in one file is the point: this is the whole
 # contract, auditable at a glance. VPC and EKS outputs land here too as their
 # consumers appear.
+#
+# All of these are String rather than SecureString, and checkov's CKV2_AWS_34 is
+# suppressed on each with that reason. None of them is a secret — a hostname, a
+# port, a database name, a role name and two AWS resource identifiers, all of
+# which are discoverable by anyone already holding credentials for this account.
+# SecureString would also make the seam worse rather than better: CDK cannot
+# resolve an encrypted parameter at synth time, which is exactly when it needs
+# these. The one real secret in this system, the master password, is not here —
+# RDS owns it in Secrets Manager.
 
 resource "aws_ssm_parameter" "db_endpoint" {
+  # checkov:skip=CKV2_AWS_34:Not a secret; SecureString cannot be resolved by CDK at synth time. See header.
   name        = "/compass/${var.env}/db/endpoint"
   description = "RDS PostgreSQL hostname"
   type        = "String"
@@ -15,6 +25,7 @@ resource "aws_ssm_parameter" "db_endpoint" {
 }
 
 resource "aws_ssm_parameter" "db_port" {
+  # checkov:skip=CKV2_AWS_34:Not a secret; SecureString cannot be resolved by CDK at synth time. See header.
   name        = "/compass/${var.env}/db/port"
   description = "RDS PostgreSQL port"
   type        = "String"
@@ -22,6 +33,7 @@ resource "aws_ssm_parameter" "db_port" {
 }
 
 resource "aws_ssm_parameter" "db_name" {
+  # checkov:skip=CKV2_AWS_34:Not a secret; SecureString cannot be resolved by CDK at synth time. See header.
   name        = "/compass/${var.env}/db/name"
   description = "Initial database name"
   type        = "String"
@@ -29,6 +41,7 @@ resource "aws_ssm_parameter" "db_name" {
 }
 
 resource "aws_ssm_parameter" "db_iam_username" {
+  # checkov:skip=CKV2_AWS_34:Not a secret; SecureString cannot be resolved by CDK at synth time. See header.
   name        = "/compass/${var.env}/db/iam_username"
   description = "Database role the application authenticates as via an IAM auth token"
   type        = "String"
@@ -36,6 +49,7 @@ resource "aws_ssm_parameter" "db_iam_username" {
 }
 
 resource "aws_ssm_parameter" "db_app_security_group_id" {
+  # checkov:skip=CKV2_AWS_34:Not a secret; SecureString cannot be resolved by CDK at synth time. See header.
   name        = "/compass/${var.env}/db/app_security_group_id"
   description = "Security group callers must attach to in order to reach the database"
   type        = "String"
@@ -43,6 +57,7 @@ resource "aws_ssm_parameter" "db_app_security_group_id" {
 }
 
 resource "aws_ssm_parameter" "db_connect_policy_arn" {
+  # checkov:skip=CKV2_AWS_34:Not a secret; SecureString cannot be resolved by CDK at synth time. See header.
   name        = "/compass/${var.env}/db/connect_policy_arn"
   description = "IAM policy granting rds-db:connect as the IAM-mapped database role"
   type        = "String"
