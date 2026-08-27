@@ -30,24 +30,42 @@ resource "aws_db_subnet_group" "main" {
 #
 # The ingestion Lambda attaches here (COMPASS-11); the EKS node group joins it
 # at COMPASS-6.
+# name_prefix + create_before_destroy, not name: AWS exposes no API to modify
+# an SG's description, so a one-word tidy-up forces replacement. Without both
+# of these, replacement is destroy-first — this SG is attached, from outside
+# this state, to things Terraform cannot see (Lambda ENIs at COMPASS-11, EKS
+# nodes at COMPASS-6) and cannot order a delete around.
 resource "aws_security_group" "app" {
   # checkov:skip=CKV2_AWS_5:Attached by consumers, not here. The ingestion Lambda joins it at COMPASS-11 and the EKS node group at COMPASS-6; it is published to SSM as the attach point.
-  name        = "compass-${var.env}-app"
+  name_prefix = "compass-${var.env}-app-"
   description = "Workloads permitted to reach the Compass data layer"
   vpc_id      = var.vpc_id
 
   tags = {
     Name = "compass-${var.env}-app"
   }
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
+# Same reasoning as aws_security_group.app: name_prefix + create_before_destroy
+# so a replacement (e.g. a description edit) creates the new group before
+# deleting the old one. Without it, a destroy-first replacement runs
+# DeleteSecurityGroup while this SG is still attached to the live RDS
+# instance, and AWS refuses with DependencyViolation.
 resource "aws_security_group" "db" {
-  name        = "compass-${var.env}-db"
+  name_prefix = "compass-${var.env}-db-"
   description = "Compass RDS PostgreSQL"
   vpc_id      = var.vpc_id
 
   tags = {
     Name = "compass-${var.env}-db"
+  }
+
+  lifecycle {
+    create_before_destroy = true
   }
 }
 
@@ -60,9 +78,10 @@ resource "aws_vpc_security_group_ingress_rule" "db_from_app" {
   referenced_security_group_id = aws_security_group.app.id
 }
 
-# The database initiates nothing. No egress rule is declared, which leaves the
-# group with none at all — AWS's implicit allow-all egress exists only on the
-# default rule created with a group, and Terraform removes that.
+# aws_security_group.db (above) declares no egress rule at all, and Terraform
+# removes the implicit allow-all that comes with a freshly created group — the
+# database initiates nothing, so it gets no egress. This rule is the app SG's
+# own egress: workloads reach the database and nothing else on this port.
 resource "aws_vpc_security_group_egress_rule" "app_to_db" {
   security_group_id            = aws_security_group.app.id
   description                  = "PostgreSQL to the Compass database"
@@ -89,15 +108,28 @@ resource "aws_vpc_security_group_egress_rule" "app_https" {
 # rds.force_ssl already defaults to 1 on PostgreSQL 15+. Stated explicitly
 # because IAM auth is meaningless over cleartext: the token is a bearer
 # credential, and anything that can read it can use it for its full 15 minutes.
+#
+# name_prefix, not name: this group pairs with create_before_destroy below,
+# and a fixed name breaks that pairing on any replacement (a family bump for a
+# major-version upgrade, most likely) — the replacement would need to be
+# created under the name the group being destroyed still holds, and RDS
+# parameter group names are unique per account/region.
 resource "aws_db_parameter_group" "main" {
-  name        = "compass-${var.env}-pg17"
+  name_prefix = "compass-${var.env}-pg17-"
   family      = "postgres17"
   description = "Compass PostgreSQL 17"
 
-  # rds.force_ssl is a static parameter, so RDS only reads it at boot. Stating
-  # apply_method explicitly is not decoration: omitting it makes the provider
-  # default to "immediate", which AWS then reports back as "pending-reboot",
-  # and every subsequent plan shows a phantom in-place update forever.
+  # rds.force_ssl is dynamic (verified live: ApplyType "dynamic" both at the
+  # postgres17 engine default and on this group) — flipping it takes effect
+  # immediately, no reboot needed. apply_method here is not about that,
+  # though: the value we declare (1) equals the engine default, so RDS never
+  # registers it as a real user override (describe-db-parameters --source
+  # user returns empty; Source stays "system"), and AWS's read-back for an
+  # unregistered dynamic parameter is "pending-reboot" regardless of what we
+  # send. Declaring "immediate" here diverges from that read-back and never
+  # converges — verified live. "pending-reboot" is the value that makes
+  # `plan` go clean, for bookkeeping reasons that have nothing to do with a
+  # reboot actually being required.
   parameter {
     name         = "rds.force_ssl"
     value        = "1"

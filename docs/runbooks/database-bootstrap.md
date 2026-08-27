@@ -243,6 +243,6 @@ aws ec2 describe-instances --filters "Name=tag:Name,Values=compass-tmp-bootstrap
   "Name=instance-state-name,Values=pending,running,stopping,stopped" \
   --query 'Reservations[].Instances[].InstanceId' --output text
 aws ec2 describe-instances --filters "Name=instance-state-name,Values=running" \
-  --query 'Reservations[].Instances[].Tags[?Key==`Name`]|[]|[0].Value' --output text
+  --query 'Reservations[].Instances[].Tags[?Key==`Name`].Value|[]' --output text
 (cd infra/terraform/envs/dev && terraform plan)
 ```

@@ -27,7 +27,7 @@ COMPASS-8's problem (permission boundaries), and COMPASS-8 is currently cut.
 **Established facts:**
 
 - The database is `db.t3.micro`, PostgreSQL 17.11, in private subnets, `publicly_accessible = false`, reachable only from the `compass-dev-app` security group.
-- `rds.force_ssl = 1`; the parameter is static and applies at boot.
+- `rds.force_ssl = 1`; the parameter is dynamic on PostgreSQL 15+ and applies immediately, with no reboot needed to change it.
 - pgvector 0.8.2 is installed.
 - An IAM auth token is a locally computed SigV4 signature over hostname, port and username. Generating one makes no network call. It is valid for 15 minutes.
 - The token is validated **at connect time only**. An established connection is never re-checked and survives token expiry indefinitely.
