@@ -67,8 +67,8 @@ done
 state_file="${HOME}/.claude/projects/$(printf '%s' "${PWD}" | tr '/' '-')/memory/state-of-play.md"
 if [ -f "${state_file}" ]; then
   say "--- STATE OF PLAY (read the full file before writing code) ---"
-  # Header only: everything above the first '---' separator.
-  awk 'NR>1 && /^---$/{exit} NR>1{print "  " $0}' "${state_file}"
+  # Skip the YAML frontmatter, then print the header block up to the next '---'.
+  awk '/^---$/{n++; next} n>=3 {exit} n==2 && NF {print "  " $0}' "${state_file}"
 else
   say "State of play: no file yet (${state_file##*/})"
 fi
