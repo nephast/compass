@@ -19,6 +19,10 @@ that touches IAM, networking, or data.
 ## Data
 
 - [ ] Encryption at rest (KMS) on RDS, S3, EBS volumes.
+  - Documented exception: the CloudTrail log bucket uses SSE-S3, not KMS. A CMK
+    bills per request and needs its own key policy granting CloudTrail
+    `GenerateDataKey*` — cost and surface area for no threat this single-account
+    project faces. Reasoning in ADR-0005.
 - [ ] TLS in transit everywhere, including pod-to-pod where practical.
 - [ ] No secrets in code, env files committed to git, or CDK/Terraform source — Secrets Manager or IAM auth only.
 - [ ] `.env` is gitignored and there's no `.env` in git history (`git log --all --full-history -- .env` should be empty).

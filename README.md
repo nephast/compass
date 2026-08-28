@@ -58,7 +58,7 @@ See `docs/runbooks/local-development.md` (write this as part of Epic 0) for the 
 
 This runs on a **new AWS account** using free-tier + a **$100 credit budget**. Before you deploy a single stack:
 
-1. Run `scripts/setup-aws-guardrails.sh` (or follow `docs/runbooks/aws-account-setup.md`) to enable MFA, set up AWS Budgets with alerts at $10/$25/$50/$90, and enable CloudTrail.
+1. Run `scripts/setup-aws-guardrails.sh` (or follow `docs/runbooks/aws-account-setup.md`) to set up AWS Budgets with alerts at $10/$25/$50/$90. MFA and CloudTrail are separate steps — MFA is manual (console), CloudTrail is Terraform in `infra/terraform/envs/account` (ADR-0005). `docs/runbooks/aws-account-setup.md` has the full order.
 2. Know your teardown command before you need it: `scripts/teardown.sh`. Run it at the end of every session where you don't need resources running overnight, and definitely at the end of the two weeks.
 3. EKS control plane costs money **the moment it exists**, whether or not you deploy anything to it — budget for that.
 
