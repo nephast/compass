@@ -173,6 +173,11 @@ GRANT rds_iam TO compass_migrator;
 GRANT CONNECT ON DATABASE compass TO compass_migrator;
 GRANT USAGE, CREATE ON SCHEMA public TO compass_migrator;
 
+-- Setting default privileges FOR ROLE x requires membership of x, so the master
+-- user has to be a member of the migration role before the grant below. This is
+-- administration, not a privilege escalation: compass_admin already outranks it.
+GRANT compass_migrator TO compass_admin;
+
 -- Tables created by the migration role are owned by it, so the application's
 -- grants are issued by the migration itself rather than inherited from here.
 -- This covers the sequences and anything the master user creates directly.

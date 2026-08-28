@@ -35,7 +35,12 @@ script rather than the CLI: the token is minted at connect time.
 
 Bring up a jump host with the app security group (steps 1 and 5 of
 `docs/runbooks/database-bootstrap.md` — including destroying it afterwards),
-then tunnel to it:
+then tunnel to it.
+
+The jump host only carries TCP here: it needs Session Manager and the app
+security group, and **not** the `db-migrate` policy. The auth token is minted on
+the machine running `npm run migrate`, so it is *that* identity — your local
+credentials, or CI's role — that needs `rds-db:connect` for `compass_migrator`.
 
 ```bash
 export AWS_REGION=eu-west-1
