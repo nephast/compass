@@ -1,0 +1,17 @@
+{
+  "name": "@compass/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "eslint scripts",
+    "bootstrap": "DATABASE_URL=${DATABASE_URL:-postgres://compass:compass@localhost:5432/compass} node scripts/migrate.mjs",
+    "migrate": "node scripts/migrate.mjs",
+    "migrate:down": "node scripts/migrate.mjs down"
+  },
+  "dependencies": {
+    "node-pg-migrate": "^8.0.0",
+    "pg": "^8.23.0",
+    "@aws-sdk/rds-signer": "^3.700.0"
+  }
+}

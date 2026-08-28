@@ -33,6 +33,16 @@ output "db_connect_policy_arn" {
   value       = aws_iam_policy.db_connect.arn
 }
 
+output "iam_migrator_username" {
+  description = "Database role migrations run as. Created by bootstrap SQL, not by Terraform."
+  value       = var.iam_migrator_username
+}
+
+output "db_migrate_policy_arn" {
+  description = "IAM policy granting rds-db:connect as the migration role (COMPASS-14)."
+  value       = aws_iam_policy.db_migrate.arn
+}
+
 output "master_secret_arn" {
   description = "Secrets Manager secret holding the RDS-managed master password. Bootstrap SQL only."
   value       = aws_db_instance.main.master_user_secret[0].secret_arn

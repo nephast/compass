@@ -36,6 +36,12 @@ variable "iam_db_username" {
   default     = "compass_app"
 }
 
+variable "iam_migrator_username" {
+  description = "Database role migrations run as, via an IAM auth token. Holds DDL rights the application deliberately does not. Created by bootstrap SQL, not by Terraform."
+  type        = string
+  default     = "compass_migrator"
+}
+
 variable "instance_class" {
   description = "Instance class. db.t3.micro is free-tier eligible; this account has a guardrail rejecting anything that is not."
   type        = string

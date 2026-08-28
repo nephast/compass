@@ -231,3 +231,23 @@ resource "aws_iam_policy" "db_connect" {
   description = "Open a PostgreSQL connection as ${var.iam_db_username} using an IAM auth token"
   policy      = data.aws_iam_policy_document.db_connect.json
 }
+
+# Deliberately a second policy rather than a second statement in the first one.
+# The migration role owns the schema and the application must never be able to
+# alter it, so the two permissions have to be separately attachable: the
+# ingestion Lambda gets db_connect and nothing else, and whatever runs
+# migrations gets this one.
+data "aws_iam_policy_document" "db_migrate" {
+  statement {
+    sid       = "RdsIamAuthConnectAsMigrator"
+    effect    = "Allow"
+    actions   = ["rds-db:connect"]
+    resources = ["arn:aws:rds-db:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:dbuser:${aws_db_instance.main.resource_id}/${var.iam_migrator_username}"]
+  }
+}
+
+resource "aws_iam_policy" "db_migrate" {
+  name        = "compass-${var.env}-db-migrate"
+  description = "Open a PostgreSQL connection as ${var.iam_migrator_username} using an IAM auth token (COMPASS-14)"
+  policy      = data.aws_iam_policy_document.db_migrate.json
+}
