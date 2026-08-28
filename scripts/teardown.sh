@@ -23,6 +23,11 @@ if [ -d infra/cdk ]; then
     echo "CDK destroy failed or nothing to destroy — check manually."
 fi
 
+# NB: envs/account is deliberately NOT destroyed. It holds account-lifetime
+# resources — the CloudTrail trail and its log bucket — in a separate state
+# file, so `terraform destroy` here cannot reach them. That separation is the
+# point: an audit log deleted at the end of every session is not an audit log.
+# See ADR-0005.
 echo "--- Terraform: destroying platform infra (dev) ---"
 if [ -d infra/terraform/envs/dev ] && [ -f infra/terraform/envs/dev/backend.tf ]; then
   (cd infra/terraform/envs/dev && terraform destroy -auto-approve) || \
@@ -38,5 +43,7 @@ echo "  [ ] VPC console — Interface endpoints removed (they bill hourly even i
 echo "  [ ] ECR — old image versions cleaned up if storage cost matters to you"
 echo "  [ ] CloudFront/S3 — fine to leave, effectively free at this scale"
 echo "  [ ] AWS Budgets dashboard — confirm spend has stopped climbing"
+echo "  [ ] CloudTrail — the trail SHOULD still be there. If it is missing,"
+echo "      re-apply infra/terraform/envs/account (ADR-0005)."
 echo ""
 echo "Log what you tore down and when in docs/runbooks/teardown.md's session log."

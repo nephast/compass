@@ -1,0 +1,17 @@
+# Copy to backend.tf once the state bucket exists (see
+# docs/runbooks/terraform-bootstrap.md). backend.tf is gitignored so a real
+# bucket name never lands in this public repo; this .example is the shape.
+#
+# Same bucket as envs/dev, DIFFERENT key. That separation is the whole point of
+# this root: `terraform destroy` in envs/dev can only ever touch dev's state,
+# so teardown cannot take the audit trail with it.
+
+terraform {
+  backend "s3" {
+    bucket       = "REPLACE-WITH-STATE-BUCKET"
+    key          = "account/terraform.tfstate"
+    region       = "eu-west-1"
+    encrypt      = true
+    use_lockfile = true
+  }
+}

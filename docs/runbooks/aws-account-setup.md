@@ -15,7 +15,16 @@ Do this before writing any infrastructure code.
 
 ## 3. CloudTrail
 
-- [ ] Enable a trail covering all regions, management events. Free tier covers this for a single trail.
+**Do not create this in the console.** It is Terraform, in `infra/terraform/envs/account`
+(a separate root and state file from `envs/dev`, so `scripts/teardown.sh` cannot
+destroy it). See ADR-0005 — a console-created trail was deleted as apparent
+drift precisely because nothing in the repo recorded that it was deliberate.
+
+- [ ] `cd infra/terraform/envs/account && terraform init && terraform apply`
+- [ ] Confirm delivery, which is *not* implied by the apply succeeding:
+      `aws cloudtrail get-trail-status --name compass-management-events --region eu-west-1`
+      — want `LatestDeliveryTime` set and `LatestDeliveryError` absent. First
+      delivery takes a few minutes.
 
 ## 4. Budgets
 
@@ -32,4 +41,5 @@ Keep a one-line log here of any manual console changes you make that aren't capt
 
 | Date | What | Why |
 |------|------|-----|
-| | | |
+| 2026-08-24 | CloudTrail trail + log bucket created by hand in the console (eu-west-2) | Epic 0 speed. **This is the entry that was never written at the time** — and its absence is why the trail read as drift and was deleted on 2026-08-28. Now rebuilt in Terraform; see ADR-0005. |
+| 2026-08-28 | Deleted that trail and its bucket | Believed to be untracked drift in an unused region. It was not — it was satisfying COMPASS-1. |

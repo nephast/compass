@@ -23,7 +23,7 @@ jobs:
     if: false # TODO (COMPASS-5+): flip on once infra/terraform/envs/dev has real config + backend
     strategy:
       matrix:
-        env: [dev]
+        env: [dev, account]
     defaults:
       run:
         working-directory: infra/terraform/envs/${{ matrix.env }}
@@ -35,6 +35,11 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_CI_ROLE_ARN }} # TODO: create via Terraform, least-privilege
           aws-region: ${{ vars.AWS_REGION }}
+      # TODO (COMPASS-25): bare `terraform init` finds no backend block (backend.tf
+      # is gitignored) and silently plans against empty local state. Pass the
+      # config explicitly, and note the key is PER MATRIX ENTRY — hardcoding
+      # dev/terraform.tfstate here would plan `account` against dev's state:
+      #   -backend-config="key=${{ matrix.env }}/terraform.tfstate"
       - run: terraform init
       - run: terraform plan -no-color -out=tfplan | tee plan.txt
       - name: Comment plan on PR
