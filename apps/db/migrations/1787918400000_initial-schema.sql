@@ -53,7 +53,7 @@ CREATE TABLE chunks (
 -- ARCHITECTURE.md commits to swapping LlmProvider by configuration. Titan Text
 -- Embeddings V2 is 1024; OpenAI text-embedding-3-small is 1536. Keying on
 -- (chunk_id, model) lets a re-embed run to completion alongside the old vectors
--- instead of requiring a table rewrite. See ADR-0005.
+-- instead of requiring a table rewrite. See ADR-0006.
 CREATE TABLE embeddings (
   chunk_id   UUID NOT NULL REFERENCES chunks (id) ON DELETE CASCADE,
   model      TEXT NOT NULL,
