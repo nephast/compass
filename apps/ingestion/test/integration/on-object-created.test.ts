@@ -20,7 +20,8 @@ beforeAll(() => createBucket(bucket));
 afterAll(async () => {
   try {
     await deleteBucket(bucket);
-    await pool.query("DELETE FROM chunks WHERE bucket = $1", [bucket]);
+    // chunks and embeddings cascade from documents.
+    await pool.query("DELETE FROM documents WHERE bucket = $1", [bucket]);
   } finally {
     await pool.end();
   }
@@ -31,21 +32,28 @@ async function put(key: string, body: string): Promise<void> {
 }
 
 describe("ingestion handler", () => {
-  it("stores the object body as a chunk row", async () => {
+  it("stores the object body as a chunk row with an embedding", async () => {
     const key = `docs/${randomUUID()}.txt`;
     await put(key, "hello");
 
     await handler(s3Event(bucket, key), {} as never, () => {});
 
     const { rows } = await pool.query(
-      "SELECT content, embedding FROM chunks WHERE bucket = $1 AND object_key = $2",
+      `SELECT c.content, c.ordinal, d.status, d.content_hash, e.embedding
+         FROM documents d
+         JOIN chunks c ON c.document_id = d.id
+         JOIN embeddings e ON e.chunk_id = c.id
+        WHERE d.bucket = $1 AND d.object_key = $2`,
       [bucket, key],
     );
     expect(rows).toHaveLength(1);
     expect(rows[0].content).toBe("hello");
+    expect(rows[0].ordinal).toBe(0);
+    expect(rows[0].status).toBe("embedded");
     // Placeholder embedding (COMPASS-19) -- assert the pgvector round trip
-    // produced a well-formed vector, not that it means anything.
-    expect(JSON.parse(rows[0].embedding)).toHaveLength(8);
+    // produced a well-formed vector of the migrated dimension, not that it
+    // means anything.
+    expect(JSON.parse(rows[0].embedding)).toHaveLength(1024);
   });
 
   it("is idempotent — reprocessing the same object doesn't duplicate rows", async () => {
@@ -58,7 +66,9 @@ describe("ingestion handler", () => {
     await handler(s3Event(bucket, key), {} as never, () => {});
 
     const { rows } = await pool.query(
-      "SELECT count(*)::int AS n FROM chunks WHERE bucket = $1 AND object_key = $2",
+      `SELECT count(*)::int AS n
+         FROM documents d JOIN chunks c ON c.document_id = d.id
+        WHERE d.bucket = $1 AND d.object_key = $2`,
       [bucket, key],
     );
     expect(rows[0].n).toBe(1);

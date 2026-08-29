@@ -157,13 +157,42 @@ GRANT rds_iam TO compass_app;
 GRANT CONNECT ON DATABASE compass TO compass_app;
 GRANT USAGE ON SCHEMA public TO compass_app;
 
--- Migrations run as the master user, so tables they create later would
--- otherwise be invisible to the application. This grants forward, once.
+-- The role migrations run as (COMPASS-14). Separate from both the master user
+-- and the application: it needs DDL, the application must never have DDL, and
+-- neither should depend on a password. rds_iam makes token auth the only way
+-- in, so the master password stays used exactly once -- here.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'compass_migrator') THEN
+    CREATE ROLE compass_migrator WITH LOGIN;
+  END IF;
+END
+$$;
+
+GRANT rds_iam TO compass_migrator;
+GRANT CONNECT ON DATABASE compass TO compass_migrator;
+GRANT USAGE, CREATE ON SCHEMA public TO compass_migrator;
+
+-- Setting default privileges FOR ROLE x requires membership of x, so the master
+-- user has to be a member of the migration role before the grant below. This is
+-- administration, not a privilege escalation: compass_admin already outranks it.
+GRANT compass_migrator TO compass_admin;
+
+-- Tables created by the migration role are owned by it, so the application's
+-- grants are issued by the migration itself rather than inherited from here.
+-- This covers the sequences and anything the master user creates directly.
 ALTER DEFAULT PRIVILEGES FOR ROLE compass_admin IN SCHEMA public
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO compass_app;
 ALTER DEFAULT PRIVILEGES FOR ROLE compass_admin IN SCHEMA public
   GRANT USAGE, SELECT ON SEQUENCES TO compass_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE compass_migrator IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO compass_app;
 ```
+
+`compass_migrator` needs an IAM policy allowing `rds-db:connect` for that
+database user, the same shape as the application's. The Terraform `rds` module
+emits one per user — check `connect_policy_arn` covers `compass_migrator`
+before assuming the token will be accepted.
 
 Verify, then `\q`:
 
@@ -178,7 +207,8 @@ JOIN pg_roles g ON g.oid = m.roleid
 WHERE g.rolname = 'rds_iam';
 ```
 
-Expected: a pgvector version, and one row reading `compass_app | rds_iam`.
+Expected: a pgvector version, and two rows — `compass_app | rds_iam` and
+`compass_migrator | rds_iam`.
 
 ## 4. Prove IAM authentication (the acceptance criterion)
 

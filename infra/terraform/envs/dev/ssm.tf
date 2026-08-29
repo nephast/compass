@@ -56,6 +56,22 @@ resource "aws_ssm_parameter" "db_app_security_group_id" {
   value       = module.rds.app_security_group_id
 }
 
+resource "aws_ssm_parameter" "db_migrator_username" {
+  # checkov:skip=CKV2_AWS_34:Not a secret; SecureString cannot be resolved by CDK at synth time. See header.
+  name        = "/compass/${var.env}/db/migrator_username"
+  description = "Database role migrations run as via an IAM auth token"
+  type        = "String"
+  value       = module.rds.iam_migrator_username
+}
+
+resource "aws_ssm_parameter" "db_migrate_policy_arn" {
+  # checkov:skip=CKV2_AWS_34:Not a secret; SecureString cannot be resolved by CDK at synth time. See header.
+  name        = "/compass/${var.env}/db/migrate_policy_arn"
+  description = "IAM policy granting rds-db:connect as the migration role"
+  type        = "String"
+  value       = module.rds.db_migrate_policy_arn
+}
+
 resource "aws_ssm_parameter" "db_connect_policy_arn" {
   # checkov:skip=CKV2_AWS_34:Not a secret; SecureString cannot be resolved by CDK at synth time. See header.
   name        = "/compass/${var.env}/db/connect_policy_arn"
