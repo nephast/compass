@@ -2,12 +2,18 @@ import { ConverseCommand } from "@aws-sdk/client-bedrock-runtime";
 import type { BedrockRuntimeClient } from "./client.js";
 import type { CompletionProvider, CompletionRequest, CompletionResult } from "../types.js";
 
-// Every Claude model in eu-west-1 is INFERENCE_PROFILE-only: the bare
-// `anthropic.claude-*` model id is rejected with a validation error, and the
-// profile id must be used instead. The `eu.` prefix keeps inference routing
+// Nova Lite rather than Claude, and the reason is availability, not preference:
+// Anthropic and OpenAI models require a "use case details" form to be submitted
+// for the account before they will answer, while Amazon's own models need
+// nothing. A default that fails on a fresh account is the kind of friction that
+// kills a project between sessions, so the default is a model that works out of
+// the box. Trading up to Claude is one environment variable once the form is in.
+//
+// Note the id is an INFERENCE PROFILE, not a model id. Nova and Claude are both
+// INFERENCE_PROFILE-only in eu-west-1: the bare `amazon.nova-lite-v1:0` is
+// rejected with a validation error. The `eu.` prefix keeps inference routing
 // inside EU regions; `global.` profiles also exist and route anywhere.
-// Haiku 4.5 for cost -- trading up is a configuration change.
-export const DEFAULT_COMPLETION_MODEL = "eu.anthropic.claude-haiku-4-5-20251001-v1:0";
+export const DEFAULT_COMPLETION_MODEL = "eu.amazon.nova-lite-v1:0";
 
 export class BedrockCompletionProvider implements CompletionProvider {
   constructor(

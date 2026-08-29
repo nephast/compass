@@ -24,7 +24,7 @@ A single fused interface would assert a symmetry that does not exist, and would 
 | `LLM_EMBEDDING_PROVIDER` | `bedrock` \| `fake` | `bedrock` |
 | `LLM_COMPLETION_PROVIDER` | `bedrock` \| `fake` | `bedrock` |
 | `LLM_EMBEDDING_MODEL` | model id | `amazon.titan-embed-text-v2:0` |
-| `LLM_COMPLETION_MODEL` | inference profile id | `eu.anthropic.claude-haiku-4-5-20251001-v1:0` |
+| `LLM_COMPLETION_MODEL` | inference profile id | `eu.amazon.nova-lite-v1:0` |
 
 An unrecognised provider name is an error, not a fallback: defaulting to the fake
 would let a typo in a deployed environment fill the database with meaningless
@@ -35,13 +35,22 @@ vectors while every row count and health check stayed green.
 - **Titan** is `ON_DEMAND`, so the bare model id is correct. `dimensions: 1024` and
   `normalize: true` are sent explicitly — the first states ADR-0006's width at the
   call site, the second is what makes cosine distance well behaved.
-- **Claude is `INFERENCE_PROFILE`-only** in `eu-west-1`. The bare
-  `anthropic.claude-*` id fails validation; use the `eu.`-prefixed profile id.
-  `global.` profiles also exist but route outside the EU.
-- Completions additionally require the **Anthropic use-case details form** to have
-  been submitted for the account, in the Bedrock console. Until then a `Converse`
-  call returns `ResourceNotFoundException: Model use case details have not been
-  submitted`.
+- **Nova and Claude are both `INFERENCE_PROFILE`-only** in `eu-west-1`. The bare
+  model id (`amazon.nova-lite-v1:0`, `anthropic.claude-*`) fails validation; use the
+  `eu.`-prefixed profile id. `global.` profiles also exist but route outside the EU.
+- **The completion default is Nova Lite because of access, not preference.**
+  Anthropic and OpenAI models need a "use case details" form submitted for the
+  account before they answer — until then a `Converse` call returns
+  `ResourceNotFoundException: Model use case details have not been submitted`.
+  Amazon's own models need nothing, so the default works on a fresh account.
+  Switching to Claude afterwards is one environment variable:
+
+  ```
+  LLM_COMPLETION_MODEL=eu.anthropic.claude-haiku-4-5-20251001-v1:0
+  ```
+
+  Verified working from these credentials: `eu.amazon.nova-lite-v1:0`,
+  `eu.amazon.nova-micro-v1:0`, `eu.amazon.nova-2-lite-v1:0`.
 - IAM: invoking through an inference profile needs `bedrock:InvokeModel` on the
   **profile ARN and on the underlying foundation-model ARNs in every region the
   profile can route to**. Granting the profile alone reads as missing access.
