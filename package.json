@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "description": "AI knowledge & agentic ops assistant — portfolio project. See docs/PROGRAM.md.",
   "workspaces": [
+    "packages/*",
     "apps/*",
     "infra/cdk"
   ],
