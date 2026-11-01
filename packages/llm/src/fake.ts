@@ -8,6 +8,7 @@ import {
   type EmbeddingProvider,
   type EmbeddingResult,
 } from "./types.js";
+import type { ToolCallingProvider, ToolChatRequest, ToolChatResult } from "./tools.js";
 
 // Not a test fixture. With one real vendor this is the SECOND implementation of
 // each interface, and therefore the only thing that demonstrates the seam holds
@@ -87,6 +88,74 @@ export class FakeCompletionProvider implements CompletionProvider {
       model: this.model,
       text,
       usage: { inputTokens, outputTokens: tokenize(text).length },
+    };
+  }
+}
+
+export const FAKE_TOOL_MODEL = "fake-keyword-router";
+
+/**
+ * A deterministic stand-in for a tool-calling model, so the agent loop can be
+ * exercised end to end -- locally, in CI, in the demo stack -- with no vendor.
+ * It routes on keywords in the latest user text: the first turn requests the
+ * matching tool, and once a tool result is present it answers by quoting it.
+ * A request matching no tool gets a refusal, which is what the real system
+ * prompt instructs the real model to do.
+ */
+export class FakeToolCallingProvider implements ToolCallingProvider {
+  private counter = 0;
+
+  constructor(private readonly model: string = FAKE_TOOL_MODEL) {}
+
+  async chat(request: ToolChatRequest): Promise<ToolChatResult> {
+    const last = request.messages[request.messages.length - 1];
+    const results = (last?.content ?? []).filter((b) => b.type === "tool_result");
+    const usage = { inputTokens: 0, outputTokens: 0 };
+
+    if (results.length > 0) {
+      const summary = results.map((b) => (b.type === "tool_result" ? b.content : "")).join("\n");
+      return {
+        model: this.model,
+        stopReason: "end_turn",
+        content: [{ type: "text", text: `[fake] Based on the tool results:\n${summary}` }],
+        usage,
+      };
+    }
+
+    const question = (last?.content ?? [])
+      .map((b) => (b.type === "text" ? b.text : ""))
+      .join(" ")
+      .toLowerCase();
+    const routes: [RegExp, string][] = [
+      [/\b(cost|spend|spent|bill|money)\b/, "get_aws_cost_summary"],
+      [/\b(alarm|alarms|alert|alerts)\b/, "get_cloudwatch_alarm_status"],
+      [/\b(ci|build|builds|pipeline|workflow|runs?)\b/, "get_recent_ci_runs"],
+    ];
+    const offered = new Set(request.tools.map((tool) => tool.name));
+    const match = routes.find(([pattern, tool]) => pattern.test(question) && offered.has(tool));
+
+    if (!match) {
+      return {
+        model: this.model,
+        stopReason: "end_turn",
+        content: [
+          {
+            type: "text",
+            text:
+              "[fake] I can't do that. I can only report AWS cost, CloudWatch alarm status " +
+              "and recent CI runs, all read-only.",
+          },
+        ],
+        usage,
+      };
+    }
+
+    this.counter += 1;
+    return {
+      model: this.model,
+      stopReason: "tool_use",
+      content: [{ type: "tool_use", id: `fake-${this.counter}`, name: match[1], input: {} }],
+      usage,
     };
   }
 }
