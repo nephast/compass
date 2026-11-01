@@ -36,6 +36,15 @@ module "ecr" {
   source = "../../modules/ecr"
 }
 
+module "ingress" {
+  source = "../../modules/ingress"
+
+  env                 = var.env
+  vpc_id              = module.vpc.vpc_id
+  private_subnet_ids  = module.vpc.private_subnet_ids
+  node_group_asg_name = module.eks.node_group_asg_name
+}
+
 module "eks" {
   source = "../../modules/eks"
 
@@ -44,6 +53,10 @@ module "eks" {
   public_access_cidrs      = var.eks_public_access_cidrs
   permissions_boundary_arn = local.permissions_boundary_arn
   ci_deploy_role_arn       = var.ci_deploy_role_arn
-  # Pods reach RDS through the app SG (COMPASS-13's deferred half).
-  extra_node_security_group_ids = [module.rds.app_security_group_id]
+  # Pods reach RDS through the app SG (COMPASS-13's deferred half); the ALB
+  # reaches the api NodePort through the ingress targets SG (COMPASS-18).
+  extra_node_security_group_ids = [
+    module.rds.app_security_group_id,
+    module.ingress.targets_security_group_id,
+  ]
 }
