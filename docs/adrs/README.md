@@ -8,5 +8,6 @@
 | [0004](0004-rds-iam-auth.md) | Database authentication — IAM auth vs password in Secrets Manager | Accepted |
 | [0005](0005-cloudtrail-in-account-scoped-state.md) | CloudTrail lives in account-scoped Terraform state | Accepted |
 | [0006](0006-embedding-dimension.md) | Fixed 1024-dimension embedding column | Accepted |
+| [0007](0007-api-service-shape.md) | API service shape — Fastify, re-verified JWTs, ownership in the key | Proposed |
 
 Write a new ADR (copy [`0000-template.md`](0000-template.md)) whenever you make a decision you'd need to defend in an interview — not just the big ones. "Why Fastify over Express," "why conventional commits," "why single-region" are all fair game if you had to actually weigh options. Interviewers care more about *how* you decided than *what* you decided.
