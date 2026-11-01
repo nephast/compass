@@ -9,3 +9,14 @@ variable "alert_email" {
   type        = string
   default     = null
 }
+
+variable "github_repository" {
+  description = "Repository whose workflows may assume the CI roles."
+  type        = string
+  default     = "nephast/compass"
+}
+
+variable "state_bucket" {
+  description = "Terraform state bucket name (same value as backend.tf). Set in terraform.tfvars."
+  type        = string
+}
