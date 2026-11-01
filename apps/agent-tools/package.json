@@ -1,0 +1,27 @@
+{
+  "name": "@compass/agent-tools",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "eslint src test",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run test/unit",
+    "dev": "node --env-file-if-exists=../../.env --import tsx src/main.ts",
+    "build": "esbuild src/main.ts --bundle --platform=node --target=node24 --format=esm --outfile=dist/main.mjs --banner:js=\"import{createRequire}from'module';const require=createRequire(import.meta.url);\""
+  },
+  "dependencies": {
+    "@aws-sdk/client-cloudwatch": "^3.700.0",
+    "@aws-sdk/client-cost-explorer": "^3.700.0",
+    "@aws-sdk/client-secrets-manager": "^3.700.0",
+    "@compass/llm": "*",
+    "@compass/telemetry": "*",
+    "ajv": "^8.17.0",
+    "fastify": "^5.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.0",
+    "tsx": "^4.19.0",
+    "vitest": "^4.1.0"
+  }
+}
