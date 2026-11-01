@@ -40,7 +40,7 @@ Use **Amazon RDS for PostgreSQL (`db.t3.micro`) with the `pgvector` extension** 
 | Dimension | Assessment |
 |-----------|------------|
 | Complexity | Low-medium — one extra extension, otherwise standard RDS |
-| Cost | `db.t3.micro` is inside the 12-month AWS free tier (750 instance-hours/month) |
+| Cost | `db.t3.micro`: ~$17/month against the credit. *(Correction, #53: the account is on the credit-based Free Tier plan, which has no 12-month RDS-hours offer; this row originally said "inside the 12-month free tier".)* Still an order of magnitude below the alternatives. |
 | Scalability | Good to tens of millions of vectors with proper indexing (IVFFlat/HNSW); would need to migrate at real scale |
 | Team familiarity | High — it's just Postgres |
 

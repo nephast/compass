@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-Compass is a portfolio/learning project: a RAG + agentic-ops assistant, built as a deliberate teaching scaffold. **The repo is currently a scaffold — `apps/*` and `infra/*` contain READMEs and stubs, no implementation yet.** Every directory README lists TODOs tied to ticket IDs (`COMPASS-N`) defined in `docs/PROGRAM.md`.
+Compass is a portfolio/learning project: a RAG + agentic-ops assistant. **The implementation is now in code end to end** (apps, packages, Terraform, CDK, k8s manifests, CI/CD), and the whole product runs offline via `scripts/dev-stack.sh`. What is *not* yet proven is the AWS side: the IaC validates, synths and passes its scans and assertion tests, but the AWS-side acceptance checks need a real deploy (`docs/runbooks/deploy.md`). Tickets map to `COMPASS-N` IDs defined in `docs/PROGRAM.md`.
 
 Because it is a learning project, the intended mode of work is *mentoring, not ghostwriting*: the user writes the implementation and wants review, trade-off pressure, and pointers to the relevant ticket's acceptance criteria. Do not implement whole epics unprompted; when asked for help, prefer explaining the decision space and reviewing their diff over dropping in a finished solution. `docs/PROGRAM.md` also carries "grill checkpoint" questions per epic — those are for the user to answer, not for Claude to answer for them.
 

@@ -120,6 +120,21 @@ durable credential, machine-generated and auto-rotating — the master secret
 rotates every 7 days either way. The difference is who has to cope with it:
 under Option A, nobody; under Option B, the application.
 
+## Cost (added 2026-11-01, #53)
+
+This account is on the post-July-2025 **credit-based** Free Tier plan, confirmed with
+`aws freetier get-account-plan-state` (`accountPlanType: FREE`). That plan does
+**not** include the old 12-month RDS-hours offer, so `compass-dev` bills against the
+credit:
+
+| Item | Rate | ~/month |
+|---|---|---:|
+| `db.t3.micro` instance | ~$0.020/hour | $14.60 |
+| 20 GiB gp3 storage | ~$0.127/GB-month | $2.54 |
+| **Total** | | **~$17** — about 11% of the $159.81 credit remaining when this was measured |
+
+Running only during working sessions (`scripts/teardown.sh`) cuts this to cents per day.
+
 ## Consequences
 
 **Easier:**

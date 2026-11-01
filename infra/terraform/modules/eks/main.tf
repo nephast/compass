@@ -322,6 +322,17 @@ resource "aws_iam_role_policy_attachment" "cloudwatch_agent" {
   policy_arn = "arn:${local.partition}:iam::aws:policy/CloudWatchAgentServerPolicy"
 }
 
+# Created here, before the add-on, so they carry a retention policy. Left to
+# the agent, it creates them on first write with "Never expire" -- a slow,
+# silent cost leak, and exactly the "sane retention" COMPASS-29 asks for.
+resource "aws_cloudwatch_log_group" "container_insights" {
+  # checkov:skip=CKV_AWS_158:Default SSE; a CMK would need a key policy for CloudWatch Logs and bills per request.
+  # checkov:skip=CKV_AWS_338:Seven days for a nightly-torn-down dev cluster; the dashboard's questions are about the last hour.
+  for_each          = toset(["application", "dataplane", "host", "performance"])
+  name              = "/aws/containerinsights/${local.name}/${each.value}"
+  retention_in_days = 7
+}
+
 resource "aws_eks_addon" "cloudwatch_observability" {
   cluster_name                = aws_eks_cluster.main.name
   addon_name                  = "amazon-cloudwatch-observability"
@@ -345,5 +356,5 @@ resource "aws_eks_addon" "cloudwatch_observability" {
     containerLogs = { enabled = true }
   })
 
-  depends_on = [aws_eks_node_group.main]
+  depends_on = [aws_eks_node_group.main, aws_cloudwatch_log_group.container_insights]
 }

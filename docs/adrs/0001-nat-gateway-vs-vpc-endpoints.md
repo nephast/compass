@@ -90,8 +90,10 @@ Graviton) is not free-tier eligible in `eu-west-1` and was rejected outright
 by `RunInstances` (`InvalidParameterCombination`). This ADR's own cost table
 (Option C) already anticipated the possibility — "`t4g.nano` is ~$3/mo, **or
 free-tier eligible depending on instance type/region**." `t3.micro` (x86_64)
-is free-tier eligible: **$0/mo** instead of ~$3/mo, strictly better on cost,
-at the expense of x86_64 rather than Graviton (irrelevant to this instance's
+is free-tier eligible. *(Correction, 2026-11-01, #53: on the credit-based Free
+Tier plan this account is on, eligible is not free — `t3.micro` bills ~$8/mo
+against the credit. Still the cheapest type the guardrail admits.)* The cost is
+x86_64 rather than Graviton (irrelevant to this instance's
 job — it only forwards packets, runs no application code).
 
 **Acceptance proven 2026-08-26:** `terraform plan` clean against the fully
