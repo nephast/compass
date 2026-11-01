@@ -9,6 +9,7 @@ export interface ApiConfig {
   documentsBucket: string;
   authMode: AuthMode;
   cognito: { userPoolId: string; clientIds: string[] } | null;
+  rag: { topK: number; maxDistance: number };
   uploadMaxBytes: number;
 }
 
@@ -52,6 +53,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
               .filter(Boolean),
           }
         : null,
+    rag: {
+      topK: num(env, "RAG_TOP_K", 5),
+      maxDistance: num(env, "RAG_MAX_DISTANCE", 0.75),
+    },
     uploadMaxBytes: num(env, "UPLOAD_MAX_BYTES", 5 * 1024 * 1024),
   };
 }

@@ -1,4 +1,5 @@
 import type { S3Client } from "@aws-sdk/client-s3";
+import type { CompletionProvider, EmbeddingProvider } from "@compass/llm";
 import type { Pool } from "@compass/pg";
 import {
   addLogContext,
@@ -12,6 +13,7 @@ import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import type { Authenticate, Caller } from "./auth.js";
 import type { ApiConfig } from "./config.js";
 import { listDocuments } from "./documents.js";
+import { answerQuestion } from "./rag.js";
 import {
   buildUploadKey,
   presignUpload,
@@ -24,6 +26,8 @@ export interface ApiDeps {
   config: ApiConfig;
   pool: Pool;
   s3: S3Client;
+  embedder: EmbeddingProvider;
+  completer: CompletionProvider;
   authenticate: Authenticate;
 }
 
@@ -145,6 +149,22 @@ export function buildServer(deps: ApiDeps): FastifyInstance {
   app.get("/documents", async (request: FastifyRequest) => ({
     documents: await listDocuments(deps.pool, request.caller.sub),
   }));
+
+  app.post<{ Body: { question: string } }>(
+    "/query",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["question"],
+          additionalProperties: false,
+          properties: { question: { type: "string", minLength: 1, maxLength: 2000 } },
+        },
+      },
+    },
+    async (request) =>
+      answerQuestion(deps, request.caller.sub, request.body.question.trim(), deps.config.rag),
+  );
 
   return app;
 }

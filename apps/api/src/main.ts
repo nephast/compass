@@ -1,3 +1,4 @@
+import { completionProviderFromEnv, embeddingProviderFromEnv } from "@compass/llm";
 import { createPool } from "@compass/pg";
 import { logger } from "@compass/telemetry";
 import { createAuthenticator } from "./auth.js";
@@ -13,6 +14,8 @@ const app = buildServer({
   config,
   pool,
   s3: createS3Client(localstack),
+  embedder: embeddingProviderFromEnv(),
+  completer: completionProviderFromEnv(),
   authenticate: createAuthenticator(config),
 });
 
