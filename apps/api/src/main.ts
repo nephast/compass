@@ -1,6 +1,7 @@
 import { completionProviderFromEnv, embeddingProviderFromEnv } from "@compass/llm";
 import { createPool } from "@compass/pg";
 import { logger } from "@compass/telemetry";
+import { createAgentClient } from "./agent-client.js";
 import { createAuthenticator } from "./auth.js";
 import { createS3Client } from "./uploads.js";
 import { loadConfig } from "./config.js";
@@ -17,6 +18,7 @@ const app = buildServer({
   embedder: embeddingProviderFromEnv(),
   completer: completionProviderFromEnv(),
   authenticate: createAuthenticator(config),
+  agent: createAgentClient(config.agentToolsUrl),
 });
 
 // Graceful shutdown: Kubernetes sends SIGTERM, then removes the pod from the

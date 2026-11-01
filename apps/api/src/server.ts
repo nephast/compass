@@ -10,6 +10,7 @@ import {
   type TraceContext,
 } from "@compass/telemetry";
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
+import type { AgentClient } from "./agent-client.js";
 import type { Authenticate, Caller } from "./auth.js";
 import type { ApiConfig } from "./config.js";
 import { listDocuments } from "./documents.js";
@@ -29,6 +30,7 @@ export interface ApiDeps {
   embedder: EmbeddingProvider;
   completer: CompletionProvider;
   authenticate: Authenticate;
+  agent: AgentClient;
 }
 
 declare module "fastify" {
@@ -164,6 +166,21 @@ export function buildServer(deps: ApiDeps): FastifyInstance {
     },
     async (request) =>
       answerQuestion(deps, request.caller.sub, request.body.question.trim(), deps.config.rag),
+  );
+
+  app.post<{ Body: { message: string } }>(
+    "/agent",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["message"],
+          additionalProperties: false,
+          properties: { message: { type: "string", minLength: 1, maxLength: 2000 } },
+        },
+      },
+    },
+    async (request) => deps.agent(request.body.message, request.caller.sub, request.trace),
   );
 
   return app;

@@ -17,6 +17,7 @@ const config: ApiConfig = {
   documentsBucket: "docs",
   authMode: "dev",
   cognito: null,
+  agentToolsUrl: "http://agent",
   rag: { topK: 5, maxDistance: 0.75 },
   uploadMaxBytes: 1000,
 };
@@ -29,6 +30,12 @@ function app(overrides: Partial<Parameters<typeof buildServer>[0]> = {}) {
     embedder: new FakeEmbeddingProvider(),
     completer: new FakeCompletionProvider(),
     authenticate: createAuthenticator(config),
+    agent: async (message) => ({
+      answer: `agent: ${message}`,
+      toolCalls: [],
+      iterations: 1,
+      stopReason: "end_turn",
+    }),
     ...overrides,
   });
 }
@@ -137,5 +144,15 @@ describe("http surface", () => {
     // No checksum of the (empty) body at signing time -- S3 would reject the
     // real upload against it. See createS3Client.
     expect(body.url).not.toMatch(/x-amz-checksum|x-amz-sdk-checksum/i);
+  });
+
+  it("forwards agent messages with the caller", async () => {
+    const response = await app().inject({
+      method: "POST",
+      url: "/agent",
+      headers: { "x-dev-user": "user-1" },
+      payload: { message: "what did I spend?" },
+    });
+    expect(response.json().answer).toBe("agent: what did I spend?");
   });
 });
