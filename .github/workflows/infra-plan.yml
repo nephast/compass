@@ -2,8 +2,14 @@ name: Infra plan (Terraform + CDK diff)
 
 # Posts a plan/diff as a PR comment for any infra change — the same
 # discipline a real platform team would require before touching prod-adjacent
-# infra. Nothing here applies changes; that only happens in deploy.yml /
-# promote-prod.yml, gated by environment approval.
+# infra. Nothing here applies changes: Terraform is applied by hand
+# (docs/runbooks/terraform-bootstrap.md) and CDK only from deploy-dev.yml.
+#
+# Two guards on every AWS-touching job:
+#   - fork guard (#59): a PR from a fork must never attempt OIDC auth, by
+#     design rather than by the accident of its secrets being empty;
+#   - vars.AWS_CI_ENABLED: off until the account-level Terraform (CI roles,
+#     state bucket) exists, so CI stays green before then.
 
 on:
   pull_request:
@@ -14,14 +20,15 @@ on:
 permissions:
   contents: read
   pull-requests: write
-  id-token: write # for OIDC auth to AWS — see docs/runbooks/ci-aws-auth.md
+  id-token: write # OIDC to AWS — see docs/runbooks/ci-aws-auth.md
 
 jobs:
   terraform-plan:
-    name: terraform plan (per env)
+    name: terraform plan (${{ matrix.env }})
     runs-on: ubuntu-latest
-    if: false # TODO (COMPASS-5+): flip on once infra/terraform/envs/dev has real config + backend
+    if: github.event.pull_request.head.repo.full_name == github.repository && vars.AWS_CI_ENABLED == 'true'
     strategy:
+      fail-fast: false
       matrix:
         env: [dev, account]
     defaults:
@@ -29,61 +36,73 @@ jobs:
         working-directory: infra/terraform/envs/${{ matrix.env }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: hashicorp/setup-terraform@v3
-      - name: Configure AWS credentials (OIDC — no long-lived keys)
-        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # SHA for v4.3.1
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
-          role-to-assume: ${{ secrets.AWS_CI_ROLE_ARN }} # TODO: create via Terraform, least-privilege
+          terraform_version: "1.15.2"
+      - name: Configure AWS credentials (OIDC — no long-lived keys)
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ secrets.AWS_CI_PLAN_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
-      # TODO (COMPASS-25): bare `terraform init` finds no backend block (backend.tf
-      # is gitignored) and silently plans against empty local state. Pass the
-      # config explicitly, and note the key is PER MATRIX ENTRY — hardcoding
-      # dev/terraform.tfstate here would plan `account` against dev's state:
-      #   -backend-config="key=${{ matrix.env }}/terraform.tfstate"
-      - run: terraform init
-      - run: terraform plan -no-color -out=tfplan | tee plan.txt
+      # backend.tf is gitignored (the bucket name stays out of a public repo),
+      # so the backend is configured here. The key is PER MATRIX ENTRY:
+      # hardcoding dev's key would plan `account` against dev's state.
+      - name: terraform init
+        run: |
+          cat > backend.tf <<'HCL'
+          terraform {
+            backend "s3" {}
+          }
+          HCL
+          terraform init -input=false \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="key=${{ matrix.env }}/terraform.tfstate" \
+            -backend-config="region=${{ vars.AWS_REGION }}" \
+            -backend-config="use_lockfile=true"
+      - name: terraform plan
+        run: |
+          extra=()
+          if [ "${{ matrix.env }}" = "account" ]; then extra+=(-var "state_bucket=${{ secrets.TF_STATE_BUCKET }}"); fi
+          terraform plan -input=false -no-color -lock=false "${extra[@]}" -out=tfplan | tee plan.txt
       - name: Comment plan on PR
-        uses: actions/github-script@v7
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
           script: |
             const fs = require('fs');
-            const plan = fs.readFileSync('infra/terraform/envs/${{ matrix.env }}/plan.txt', 'utf8').slice(0, 60000);
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `### Terraform plan — ${{ matrix.env }}\n\n\`\`\`\n${plan}\n\`\`\``
+            const plan = fs.readFileSync('infra/terraform/envs/${{ matrix.env }}/plan.txt', 'utf8');
+            // Redact 12-digit account ids: PR comments on a public repo are public.
+            const body = plan.replace(/\b\d{12}\b/g, '<account>').slice(-60000);
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number, owner: context.repo.owner, repo: context.repo.repo,
+              body: `### Terraform plan — ${{ matrix.env }}\n\n\`\`\`\n${body}\n\`\`\``,
             });
 
   cdk-diff:
     name: cdk diff
     runs-on: ubuntu-latest
-    if: false # TODO (COMPASS-9+): flip on once infra/cdk has real stacks
-    defaults:
-      run:
-        working-directory: infra/cdk
+    if: github.event.pull_request.head.repo.full_name == github.repository && vars.AWS_CI_ENABLED == 'true'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # SHA for v4.3.1
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
-          role-to-assume: ${{ secrets.AWS_CI_ROLE_ARN }}
+          role-to-assume: ${{ secrets.AWS_CI_PLAN_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
-      - run: npx cdk diff --all > diff.txt || true
+      - name: cdk diff
+        working-directory: infra/cdk
+        run: npx cdk diff --all --context env=dev --no-notices 2>&1 | tee diff.txt || true
       - name: Comment diff on PR
-        uses: actions/github-script@v7
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
           script: |
             const fs = require('fs');
-            const diff = fs.readFileSync('infra/cdk/diff.txt', 'utf8').slice(0, 60000);
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `### CDK diff\n\n\`\`\`\n${diff}\n\`\`\``
+            const diff = fs.readFileSync('infra/cdk/diff.txt', 'utf8').replace(/\b\d{12}\b/g, '<account>').slice(-60000);
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number, owner: context.repo.owner, repo: context.repo.repo,
+              body: `### CDK diff (dev)\n\n\`\`\`\n${diff}\n\`\`\``,
             });
