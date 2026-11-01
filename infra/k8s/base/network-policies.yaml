@@ -1,0 +1,42 @@
+# Enforced by the VPC CNI's network policy agent (enabled in modules/eks).
+# Default-deny ingress for the namespace, then two explicit allows.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+# The api is reached by the internal ALB through the NodePort; with
+# externalTrafficPolicy Cluster the source is a VPC address, never the
+# internet. The ALB's own security group is the real gate (VPC Link only).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-from-vpc
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: api }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - ipBlock: { cidr: 10.0.0.0/16 }
+      ports:
+        - { port: 8080, protocol: TCP }
+---
+# agent-tools holds the Cost Explorer / CloudWatch role; only the api may call it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: agent-tools-from-api
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: agent-tools }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { app.kubernetes.io/name: api }
+      ports:
+        - { port: 8080, protocol: TCP }

@@ -1,0 +1,26 @@
+# dev overlay. The environment-specific values (bucket, Cognito ids, database
+# host, IRSA role ARNs) are NOT in this repo: scripts/k8s-deploy.sh reads them
+# from SSM Parameter Store into config.env and irsa.env (both gitignored) and
+# then applies this overlay -- the same seam CDK and Terraform use.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: compass
+resources:
+  - ../../base
+configMapGenerator:
+  - name: compass-config
+    envs: [config.env]
+  # Only a vehicle for the replacements below; harmless to have in-cluster.
+  - name: irsa
+    envs: [irsa.env]
+replacements:
+  - source: { kind: ConfigMap, name: irsa, fieldPath: data.API_ROLE_ARN }
+    targets:
+      - select: { kind: ServiceAccount, name: api }
+        fieldPaths: ["metadata.annotations.[eks.amazonaws.com/role-arn]"]
+  - source: { kind: ConfigMap, name: irsa, fieldPath: data.AGENT_ROLE_ARN }
+    targets:
+      - select: { kind: ServiceAccount, name: agent-tools }
+        fieldPaths: ["metadata.annotations.[eks.amazonaws.com/role-arn]"]
+generatorOptions:
+  disableNameSuffixHash: false

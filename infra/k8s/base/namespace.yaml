@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: compass
+  labels:
+    # Pod Security Admission, "restricted" profile: the API server rejects any
+    # pod in this namespace that runs as root, escalates privileges, keeps
+    # Linux capabilities or mounts host paths. Enforced, not just warned.
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/warn: restricted

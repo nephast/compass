@@ -1,0 +1,125 @@
+# The api service (COMPASS-17). Reached from the internal ALB via NodePort
+# 30080 (infra/terraform/modules/ingress) -- the port must match there.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: api
+  annotations:
+    # IRSA: filled per environment by the overlay from SSM (CDK creates the role).
+    eks.amazonaws.com/role-arn: REPLACED_BY_OVERLAY
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  labels: { app.kubernetes.io/name: api, app.kubernetes.io/part-of: compass }
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5 # what `kubectl rollout undo` can go back to
+  selector:
+    matchLabels: { app.kubernetes.io/name: api }
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # Never below the current replica count during a rollout: a new pod
+      # must be Ready before an old one is removed.
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: api, app.kubernetes.io/part-of: compass }
+    spec:
+      serviceAccountName: api
+      automountServiceAccountToken: true # needed for the IRSA web identity token
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
+      # One replica per node where possible, so losing a node never takes
+      # both replicas -- the "killing a pod causes a clean replacement, not a
+      # cascading failure" half of the acceptance criterion.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: { app.kubernetes.io/name: api }
+      containers:
+        - name: api
+          image: compass-api # rewritten to <registry>/compass-api:<sha> at deploy
+          ports:
+            - { name: http, containerPort: 8080 }
+          envFrom:
+            - configMapRef: { name: compass-config }
+          env:
+            - { name: SERVICE_NAME, value: api }
+            - { name: AGENT_TOOLS_URL, value: "http://agent-tools.compass.svc.cluster.local" }
+          # Requests are what the scheduler reserves and what the HPA's
+          # percentage is OF; sized from `kubectl top pods` under the smoke
+          # test (idle ~15m/90Mi). Memory limit = request + headroom: Node does
+          # not return heap to the OS eagerly, so a tight limit means OOMKills.
+          # No CPU limit: CFS throttling on a 2-vCPU t3.small hurts latency
+          # more than a noisy neighbour would.
+          resources:
+            requests: { cpu: 100m, memory: 160Mi }
+            limits: { memory: 320Mi }
+          # Both probes hit /healthz, which touches no dependency, so a
+          # database outage never makes Kubernetes restart every pod at once.
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 5
+            failureThreshold: 2
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: { sizeLimit: 16Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+spec:
+  type: NodePort
+  selector: { app.kubernetes.io/name: api }
+  ports:
+    - { name: http, port: 80, targetPort: http, nodePort: 30080 }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: api }
+  minReplicas: 2
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 70 }
+  behavior:
+    # Scale up fast, down slowly: flapping costs more than a spare pod.
+    scaleDown:
+      stabilizationWindowSeconds: 300
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: api
+spec:
+  # Node drains (upgrades, scale-in) evict at most one replica at a time.
+  minAvailable: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: api }

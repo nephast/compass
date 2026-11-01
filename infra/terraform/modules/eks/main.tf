@@ -242,12 +242,25 @@ resource "aws_eks_node_group" "main" {
 # Managed add-ons rather than self-installed manifests: AWS patches them, and
 # their versions show up in `terraform plan` instead of drifting silently.
 resource "aws_eks_addon" "core" {
-  for_each = toset(["vpc-cni", "kube-proxy", "coredns", "metrics-server"])
+  for_each = toset(["kube-proxy", "coredns", "metrics-server"])
 
   cluster_name                = aws_eks_cluster.main.name
   addon_name                  = each.value
   resolve_conflicts_on_create = "OVERWRITE"
   resolve_conflicts_on_update = "OVERWRITE"
+
+  depends_on = [aws_eks_node_group.main]
+}
+
+# The VPC CNI with its network policy agent switched on: without it,
+# NetworkPolicy objects (infra/k8s/base/network-policies.yaml) are accepted by
+# the API server and silently enforce nothing.
+resource "aws_eks_addon" "vpc_cni" {
+  cluster_name                = aws_eks_cluster.main.name
+  addon_name                  = "vpc-cni"
+  resolve_conflicts_on_create = "OVERWRITE"
+  resolve_conflicts_on_update = "OVERWRITE"
+  configuration_values        = jsonencode({ enableNetworkPolicy = "true" })
 
   depends_on = [aws_eks_node_group.main]
 }
