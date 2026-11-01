@@ -8,6 +8,7 @@ import {
   type EmbeddingProvider,
   type EmbeddingResult,
 } from "./types.js";
+import type { ToolCallingProvider, ToolChatRequest, ToolChatResult } from "./tools.js";
 
 // Not a test fixture. With one real vendor this is the SECOND implementation of
 // each interface, and therefore the only thing that demonstrates the seam holds
@@ -73,7 +74,17 @@ export class FakeEmbeddingProvider implements EmbeddingProvider {
   }
 }
 
-/** Deterministic and offline: echoes the last user message with a marker. */
+/**
+ * Deterministic and offline. Two behaviours:
+ *
+ * - Given a grounded RAG prompt (numbered "[n]" passages and a "Question:"
+ *   line), it answers EXTRACTIVELY: the passage sentence sharing the most
+ *   words with the question, cited with its passage number. If nothing
+ *   overlaps, it returns the refusal sentence the system prompt names. This
+ *   makes the local stack and the demo behave like the real flow -- cited
+ *   answers, honest "not found" -- with no model at all.
+ * - Anything else is echoed with a marker.
+ */
 export class FakeCompletionProvider implements CompletionProvider {
   constructor(private readonly model: string = FAKE_COMPLETION_MODEL) {}
 
@@ -81,12 +92,111 @@ export class FakeCompletionProvider implements CompletionProvider {
     const lastUserMessage = [...request.messages].reverse().find((m) => m.role === "user");
     const prompt = lastUserMessage?.content ?? "";
     const inputTokens = request.messages.reduce((sum, m) => sum + tokenize(m.content).length, 0);
-    const text = `[fake] ${prompt}`;
+    const text = extractiveAnswer(prompt, request.system) ?? `[fake] ${prompt}`;
 
     return {
       model: this.model,
       text,
       usage: { inputTokens, outputTokens: tokenize(text).length },
+    };
+  }
+}
+
+const STOPWORDS = new Set(
+  "a an and are as at be by do does for from how i in is it of on or the to what when where which who why with you your my can".split(
+    " ",
+  ),
+);
+
+function extractiveAnswer(prompt: string, system: string | undefined): string | null {
+  const question = /\nQuestion: (.+)$/s.exec(prompt)?.[1];
+  if (!question || !prompt.startsWith("Passages:")) return null;
+
+  const wanted = new Set(tokenize(question).filter((t) => !STOPWORDS.has(t)));
+  let best: { n: string; sentence: string; score: number } | null = null;
+  for (const block of prompt.split(/\n---\n/)) {
+    const header = /\[(\d+)\][^\n]*\n([\s\S]*)/.exec(block);
+    if (!header) continue;
+    // Lines as well as sentences, so a Markdown heading is its own candidate
+    // instead of being glued to the first sentence under it.
+    for (const sentence of (header[2] ?? "").split(/(?<=[.!?])\s+|\n+/)) {
+      if (/^\s*#/.test(sentence)) continue;
+      const score = tokenize(sentence).filter((t) => wanted.has(t)).length;
+      if (!best || score > best.score)
+        best = { n: header[1] ?? "1", sentence: sentence.trim(), score };
+    }
+  }
+
+  if (!best || best.score === 0) {
+    return /reply with exactly: (.+)$/m.exec(system ?? "")?.[1]?.trim() ?? "[fake] no answer found";
+  }
+  return `${best.sentence} [${best.n}]`;
+}
+
+export const FAKE_TOOL_MODEL = "fake-keyword-router";
+
+/**
+ * A deterministic stand-in for a tool-calling model, so the agent loop can be
+ * exercised end to end -- locally, in CI, in the demo stack -- with no vendor.
+ * It routes on keywords in the latest user text: the first turn requests the
+ * matching tool, and once a tool result is present it answers by quoting it.
+ * A request matching no tool gets a refusal, which is what the real system
+ * prompt instructs the real model to do.
+ */
+export class FakeToolCallingProvider implements ToolCallingProvider {
+  private counter = 0;
+
+  constructor(private readonly model: string = FAKE_TOOL_MODEL) {}
+
+  async chat(request: ToolChatRequest): Promise<ToolChatResult> {
+    const last = request.messages[request.messages.length - 1];
+    const results = (last?.content ?? []).filter((b) => b.type === "tool_result");
+    const usage = { inputTokens: 0, outputTokens: 0 };
+
+    if (results.length > 0) {
+      const summary = results.map((b) => (b.type === "tool_result" ? b.content : "")).join("\n");
+      return {
+        model: this.model,
+        stopReason: "end_turn",
+        content: [{ type: "text", text: `[fake] Based on the tool results:\n${summary}` }],
+        usage,
+      };
+    }
+
+    const question = (last?.content ?? [])
+      .map((b) => (b.type === "text" ? b.text : ""))
+      .join(" ")
+      .toLowerCase();
+    const routes: [RegExp, string][] = [
+      [/\b(cost|spend|spent|bill|money)\b/, "get_aws_cost_summary"],
+      [/\b(alarm|alarms|alert|alerts)\b/, "get_cloudwatch_alarm_status"],
+      [/\b(ci|build|builds|pipeline|workflow|runs?)\b/, "get_recent_ci_runs"],
+    ];
+    const offered = new Set(request.tools.map((tool) => tool.name));
+    const match = routes.find(([pattern, tool]) => pattern.test(question) && offered.has(tool));
+
+    if (!match) {
+      return {
+        model: this.model,
+        stopReason: "end_turn",
+        content: [
+          {
+            type: "text",
+            text:
+              "[fake] I can't do that. I can only report AWS cost, CloudWatch alarm status " +
+              "and recent CI runs, all read-only.",
+          },
+        ],
+        usage,
+      };
+    }
+
+    this.counter += 1;
+    return {
+      model: this.model,
+      stopReason: "tool_use",
+      content: [{ type: "tool_use", id: `fake-${this.counter}`, name: match[1], input: {} }],
+      usage,
     };
   }
 }
