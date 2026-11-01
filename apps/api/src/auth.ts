@@ -48,7 +48,7 @@ export function createAuthenticator(config: ApiConfig): Authenticate {
   // (its `client_id` claim is checked against the configured audience).
   const verifier = CognitoJwtVerifier.create({
     userPoolId: cognito.userPoolId,
-    clientId: cognito.clientId,
+    clientId: cognito.clientIds,
     tokenUse: "access",
   });
 

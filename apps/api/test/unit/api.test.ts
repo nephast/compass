@@ -76,7 +76,7 @@ describe("cognito authenticator", () => {
   const authenticate = createAuthenticator({
     ...config,
     authMode: "cognito",
-    cognito: { userPoolId: "eu-west-1_abcdefghi", clientId: "client" },
+    cognito: { userPoolId: "eu-west-1_abcdefghi", clientIds: ["client"] },
   });
 
   it("rejects a missing or garbage bearer token as 401", async () => {

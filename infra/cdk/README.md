@@ -1,21 +1,45 @@
 # infra/cdk — application infrastructure
 
-Owns: S3 (docs bucket + frontend hosting), CloudFront, API Gateway, Lambda
-(ingestion), Step Functions, EventBridge, Cognito, SQS/DLQ. See ADR (in
-`docs/ARCHITECTURE.md`) for why this is split from `infra/terraform`.
+Owns S3, CloudFront, WAF, API Gateway, Lambda, Step Functions, EventBridge,
+Cognito, the pods' IRSA roles, dashboards and alarms. Terraform owns the platform
+(VPC, EKS, RDS, ECR, ALB, the permissions boundary) and publishes it to SSM; CDK
+reads it back at **deploy** time (`lib/seam.ts`), so `cdk synth` needs no AWS
+credentials and nothing account-specific lands in `cdk.context.json`.
 
-Reads the VPC ID, subnet IDs, and EKS OIDC provider ARN that Terraform created
-from **SSM Parameter Store** (not hardcoded, not passed via `.env`) — Terraform
-writes them, CDK reads them. This is the cross-stack seam; get it working early
-(COMPASS-5/6 write the parameters, COMPASS-9+ reads them).
+## Stacks (`--context env=dev`)
 
-## TODO
+| Stack | Region | What | Ticket |
+|---|---|---|---|
+| `Compass-dev-EdgeWaf` | us-east-1 | WAF web ACL: per-IP rate limit + AWS managed rules; ARN → SSM | COMPASS-32 |
+| `Compass-dev-Frontend` | eu-west-1 | private S3 + CloudFront (OAC), security headers, WAF attached | COMPASS-24 |
+| `Compass-dev-Auth` | eu-west-1 | Cognito pool, PKCE web client (15-min tokens), smoke-test client | COMPASS-15 |
+| `Compass-dev-Ingestion` | eu-west-1 | documents bucket → EventBridge → Step Functions → ingest Lambda (VPC, IAM DB auth) | COMPASS-9–12 |
+| `Compass-dev-Api` | eu-west-1 | HTTP API + JWT authorizer + VPC Link → internal ALB; IRSA roles; agent secret | COMPASS-16, 18 |
+| `Compass-dev-Site` | eu-west-1 | static export + `config.json`, CloudFront invalidation in the same deploy | COMPASS-24 |
+| `Compass-dev-Observability` | eu-west-1 | dashboard + 4 alarms → SNS | COMPASS-29, 30 |
 
-- [ ] `cdk init app --language typescript` in this directory
-- [ ] `bin/compass.ts` — entry point, one stack set per environment (`dev`, `prod`) via CDK context (`--context env=dev`)
-- [ ] `lib/ingestion-stack.ts` — S3, EventBridge, Step Functions, SQS/DLQ, Lambdas (COMPASS-9–12)
-- [ ] `lib/data-stack.ts` — if RDS ends up here instead of Terraform, document that choice; default assumption is Terraform owns it (ADR-0002)
-- [ ] `lib/auth-stack.ts` — Cognito User Pool + client (COMPASS-15)
-- [ ] `lib/api-stack.ts` — API Gateway HTTP API + JWT authorizer + VPC Link into EKS (COMPASS-16)
-- [ ] `lib/frontend-stack.ts` — S3 + CloudFront with Origin Access Control, cache invalidation output for CI to use (COMPASS-24)
-- [ ] Every stack: tag all resources (`Project=compass`, `Environment=<env>`) for cost allocation reporting (COMPASS-37)
+## Deploy
+
+Prerequisites: `infra/terraform/envs/account` and `envs/dev` applied (they write the
+SSM parameters), and CDK bootstrapped in **both** regions:
+
+```bash
+npx cdk bootstrap aws://<account>/eu-west-1 aws://<account>/us-east-1
+```
+
+```bash
+npm run build -w @compass/frontend      # optional: without it the Site stack deploys a placeholder page
+npx cdk deploy --all --context env=dev --context alertEmail=you@example.com
+```
+
+## Guarantees the tests check (`npm test -w @compass/cdk`)
+
+- Every IAM role in every stack carries `compass-permissions-boundary` — including
+  CDK's own custom-resource roles, which the built-in mechanism misses
+  (`lib/boundary.ts`), and with no `crossRegionReferences` (its writer role could
+  never be bounded).
+- No template contains a literal account id.
+- Frontend bucket is fully private; one OAC; WAF attached; deploy invalidates `/*`.
+- Every API route except `GET /healthz` requires the JWT authorizer; the stage is throttled.
+- Each IRSA role trusts exactly one service account.
+- The four alarms exist.

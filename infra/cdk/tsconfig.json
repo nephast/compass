@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"],
+    // aws-cdk-lib's own declarations are not written for this flag (optional
+    // props typed `T | undefined` collide with `?: T`), so it produces errors
+    // in CDK's types rather than ours. Off for this workspace only.
+    "exactOptionalPropertyTypes": false
+  },
+  "include": ["bin/**/*.ts", "lib/**/*.ts", "test/**/*.ts"]
+}

@@ -1,0 +1,4 @@
+{
+  "app": "npx tsx bin/compass.ts",
+  "watch": { "include": ["bin/**", "lib/**"] }
+}

@@ -8,7 +8,7 @@ export interface ApiConfig {
   port: number;
   documentsBucket: string;
   authMode: AuthMode;
-  cognito: { userPoolId: string; clientId: string } | null;
+  cognito: { userPoolId: string; clientIds: string[] } | null;
   agentToolsUrl: string;
   rag: { topK: number; maxDistance: number };
   uploadMaxBytes: number;
@@ -47,7 +47,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
       authMode === "cognito"
         ? {
             userPoolId: required(env, "COGNITO_USER_POOL_ID"),
-            clientId: required(env, "COGNITO_CLIENT_ID"),
+            // Comma-separated: the web client and the smoke-test client.
+            clientIds: required(env, "COGNITO_CLIENT_ID")
+              .split(",")
+              .map((id) => id.trim())
+              .filter(Boolean),
           }
         : null,
     agentToolsUrl: env.AGENT_TOOLS_URL ?? "http://agent-tools.compass.svc.cluster.local",
