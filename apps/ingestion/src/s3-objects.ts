@@ -9,8 +9,32 @@ const client = new S3Client({
   ...(isLocalstack ? { forcePathStyle: true } : {}),
 });
 
-export async function getObjectText(bucket: string, key: string): Promise<string> {
-  const { Body } = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
-  if (!Body) throw new Error(`empty body for s3://${bucket}/${key}`);
-  return Body.transformToString();
+export type FetchedObject =
+  | {
+      kind: "ok";
+      bytes: Uint8Array;
+      /** Empty string for an unversioned bucket -- matches documents.version_id. */
+      versionId: string;
+    }
+  | { kind: "too-large"; byteSize: number; versionId: string };
+
+// Hard cap before reading the body. Not a chunker concern: a 2 GB upload would
+// exhaust the Lambda's memory in transformToByteArray long before any code
+// could reject it. The presigned PUT enforces the same limit at upload time
+// (apps/api), so this is the second belt.
+export const MAX_OBJECT_BYTES = 5 * 1024 * 1024;
+
+export async function getObject(bucket: string, key: string): Promise<FetchedObject> {
+  const response = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+  if (!response.Body) throw new Error(`empty body for s3://${bucket}/${key}`);
+  const versionId = response.VersionId ?? "";
+  const byteSize = response.ContentLength ?? 0;
+  if (byteSize > MAX_OBJECT_BYTES) {
+    // Read nothing: release the socket instead of draining 2 GB through it.
+    await response.Body.transformToWebStream()
+      .cancel()
+      .catch(() => undefined);
+    return { kind: "too-large", byteSize, versionId };
+  }
+  return { kind: "ok", bytes: await response.Body.transformToByteArray(), versionId };
 }

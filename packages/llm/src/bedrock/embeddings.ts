@@ -31,6 +31,10 @@ export class BedrockEmbeddingProvider implements EmbeddingProvider {
     private readonly modelId: string = DEFAULT_EMBEDDING_MODEL,
   ) {}
 
+  get model(): string {
+    return this.modelId;
+  }
+
   async embed(texts: string[]): Promise<EmbeddingResult> {
     assertEmbeddableTexts(texts);
     const vectors: number[][] = new Array<number[]>(texts.length);

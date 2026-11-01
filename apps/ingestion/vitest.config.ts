@@ -11,6 +11,9 @@ try {
 }
 process.env.LOCALSTACK_ENDPOINT ??= "http://localhost:4566";
 process.env.DATABASE_URL ??= "postgresql://compass:compass@localhost:5432/compass";
+// The offline embedder: lexically meaningful vectors, no credentials, no spend.
+// Bedrock is exercised by packages/llm's own integration tier instead.
+process.env.LLM_EMBEDDING_PROVIDER ??= "fake";
 
 // Tiers are directories, not filename suffixes, so the scripts that select
 // them stay obvious: test/unit (no Docker, runs in CI), test/integration

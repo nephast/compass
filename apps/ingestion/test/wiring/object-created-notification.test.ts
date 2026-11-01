@@ -53,7 +53,8 @@ describe("S3 ObjectCreated -> Lambda (LocalStack)", () => {
     // only exist if the Lambda ran and completed.
     for (let attempt = 0; attempt < 60; attempt++) {
       const { rows } = await pool.query(
-        "SELECT content FROM chunks WHERE bucket = $1 AND object_key = $2",
+        `SELECT c.content FROM chunks c JOIN documents d ON d.id = c.document_id
+          WHERE d.bucket = $1 AND d.object_key = $2`,
         [bucket, key],
       );
       if (rows.length === 1) {
