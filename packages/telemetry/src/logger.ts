@@ -18,6 +18,20 @@ export function withLogContext<T>(fields: LogFields, work: () => T): T {
   return context.run({ ...context.getStore(), ...fields }, work);
 }
 
+/**
+ * For framework hooks that cannot wrap the handler in a callback (Fastify's
+ * onRequest): binds the fields to the rest of the current async execution.
+ */
+export function enterLogContext(fields: LogFields): void {
+  context.enterWith({ ...context.getStore(), ...fields });
+}
+
+/** Adds fields to the current request's context, e.g. the user once known. */
+export function addLogContext(fields: LogFields): void {
+  const store = context.getStore();
+  if (store) Object.assign(store, fields);
+}
+
 export function logContext(): LogFields {
   return context.getStore() ?? {};
 }
