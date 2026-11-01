@@ -37,7 +37,9 @@ export class SiteStack extends Stack {
       // Synth must not depend on the frontend being built (CI's cdk diff job
       // never builds it); a placeholder deploys an obviously-unbuilt page.
       existsSync(siteDir)
-        ? deploy.Source.asset(siteDir)
+        ? // The build copies public/, which holds the LOCAL config; the
+          // deployed config.json comes only from jsonData below.
+          deploy.Source.asset(siteDir, { exclude: ["config.json", "config.local.json"] })
         : deploy.Source.data("index.html", "<h1>Frontend not built</h1>"),
       deploy.Source.jsonData("config.json", props.config),
     ];

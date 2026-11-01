@@ -41,7 +41,9 @@ describe("account hygiene", () => {
 
   it("no template contains a literal 12-digit account id (public repo)", () => {
     for (const [name, json] of raw) {
-      expect(json, name).not.toMatch(/(?<![0-9])[0-9]{12}(?![0-9])/);
+      // Alphanumeric boundaries: asset hashes are hex and can contain twelve
+      // digits in a row without being an account id.
+      expect(json, name).not.toMatch(/(?<![0-9A-Za-z])[0-9]{12}(?![0-9A-Za-z])/);
     }
   });
 
