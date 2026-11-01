@@ -14,3 +14,9 @@ variable "retention_days" {
     error_message = "Retention must exceed 90 days; below that, free Event History already covers the window and the trail earns only its multi-region aggregation."
   }
 }
+
+variable "alert_email" {
+  description = "Email subscribed to the trail-tamper SNS topic. Kept out of the repo: set it in an untracked terraform.tfvars. Null creates the topic with no subscriber."
+  type        = string
+  default     = null
+}

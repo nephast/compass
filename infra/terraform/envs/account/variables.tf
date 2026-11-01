@@ -3,3 +3,9 @@ variable "region" {
   type        = string
   default     = "eu-west-1"
 }
+
+variable "alert_email" {
+  description = "Where security alerts go. Set in an untracked terraform.tfvars, never in the repo."
+  type        = string
+  default     = null
+}

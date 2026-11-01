@@ -17,3 +17,8 @@ output "bucket_arn" {
   description = "ARN of the S3 bucket receiving log files."
   value       = aws_s3_bucket.trail.arn
 }
+
+output "tamper_topic_arn" {
+  description = "SNS topic notified when the trail is stopped, deleted or reconfigured."
+  value       = aws_sns_topic.trail_tamper.arn
+}
