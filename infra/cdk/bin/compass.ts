@@ -1,5 +1,7 @@
 import { App, Aspects, Tags, type AppProps } from "aws-cdk-lib";
 import { BOUNDARY_NAME, BoundaryOnRawRoles } from "../lib/boundary.js";
+import { EdgeWafStack } from "../lib/edge-waf-stack.js";
+import { FrontendStack } from "../lib/frontend-stack.js";
 import { IngestionStack } from "../lib/ingestion-stack.js";
 
 // COMPASS-8 on the CDK side: every IAM role in every stack -- including the
@@ -29,9 +31,15 @@ export function buildApp(props: AppProps = {}): App {
   const env = { account, region };
   const prefix = `Compass-${envName}`;
 
-  // The browser origins allowed to PUT straight to the documents bucket. The
-  // CloudFront URL joins this list when the frontend stack exists (COMPASS-24).
-  const corsOrigins = ["http://localhost:3000"];
+  const waf = new EdgeWafStack(app, `${prefix}-EdgeWaf`, {
+    env: { account, region: "us-east-1" },
+    envName,
+  });
+
+  const frontend = new FrontendStack(app, `${prefix}-Frontend`, { env, envName });
+  frontend.addStackDependency(waf, "reads the web ACL ARN the WAF stack publishes");
+  const siteUrl = `https://${frontend.distribution.distributionDomainName}`;
+  const corsOrigins = [siteUrl, "http://localhost:3000"];
 
   new IngestionStack(app, `${prefix}-Ingestion`, { env, envName, corsOrigins });
 

@@ -10,5 +10,6 @@
 | [0006](0006-embedding-dimension.md) | Fixed 1024-dimension embedding column | Accepted |
 | [0007](0007-api-service-shape.md) | API service shape — Fastify, re-verified JWTs, ownership in the key | Proposed |
 | [0008](0008-read-only-agent-tools.md) | The agent gets read-only tools only, enforced in code | Proposed |
+| [0009](0009-edge-protection-http-api.md) | Edge protection — WAF on CloudFront, throttling on the HTTP API | Proposed |
 
 Write a new ADR (copy [`0000-template.md`](0000-template.md)) whenever you make a decision you'd need to defend in an interview — not just the big ones. "Why Fastify over Express," "why conventional commits," "why single-region" are all fair game if you had to actually weigh options. Interviewers care more about *how* you decided than *what* you decided.
