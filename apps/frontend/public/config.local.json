@@ -1,0 +1,5 @@
+{
+  "env": "local",
+  "apiUrl": "http://localhost:8080",
+  "authMode": "dev"
+}
