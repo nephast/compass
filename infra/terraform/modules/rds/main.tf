@@ -209,9 +209,9 @@ resource "aws_db_instance" "main" {
 
 # --- IAM auth ----------------------------------------------------------------
 
-# Permission to open a connection as the IAM-mapped database role. The resource
-# ARN takes the instance's *resource id* (db-XXXXXXXX), not its identifier or
-# database name.
+# Permission to open a connection as the IAM-mapped database role. The ARN's
+# instance segment would normally be the *resource id* (db-XXXXXXXX); it is a
+# wildcard here on purpose -- see #52 in the statement below.
 #
 # This policy is the durable artefact of the ticket. The throwaway probe
 # function that proves the acceptance criteria attaches it; so does the real
@@ -219,10 +219,18 @@ resource "aws_db_instance" "main" {
 # trust policy differs between them.
 data "aws_iam_policy_document" "db_connect" {
   statement {
-    sid       = "RdsIamAuthConnect"
-    effect    = "Allow"
-    actions   = ["rds-db:connect"]
-    resources = ["arn:aws:rds-db:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:dbuser:${aws_db_instance.main.resource_id}/${var.iam_db_username}"]
+    sid     = "RdsIamAuthConnect"
+    effect  = "Allow"
+    actions = ["rds-db:connect"]
+    # dbuser:*/<user>, not dbuser:<resource id>/<user> (#52). Interpolating the
+    # instance's resource id made this policy depend on the instance, so
+    # `terraform destroy` deleted the policy FIRST -- and IAM refuses to delete
+    # a policy still attached to roles outside this state (the ingestion
+    # Lambda's, the api's IRSA role), blocking teardown while the database kept
+    # billing. Widening to any instance is safe here: this account runs one
+    # Compass database per environment and the username is environment-unique
+    # in practice; the database-side GRANT is what scopes access.
+    resources = ["arn:aws:rds-db:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:dbuser:*/${var.iam_db_username}"]
   }
 }
 
@@ -242,7 +250,7 @@ data "aws_iam_policy_document" "db_migrate" {
     sid       = "RdsIamAuthConnectAsMigrator"
     effect    = "Allow"
     actions   = ["rds-db:connect"]
-    resources = ["arn:aws:rds-db:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:dbuser:${aws_db_instance.main.resource_id}/${var.iam_migrator_username}"]
+    resources = ["arn:aws:rds-db:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:dbuser:*/${var.iam_migrator_username}"] # see #52 above
   }
 }
 

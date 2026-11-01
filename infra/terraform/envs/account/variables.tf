@@ -3,3 +3,20 @@ variable "region" {
   type        = string
   default     = "eu-west-1"
 }
+
+variable "alert_email" {
+  description = "Where security alerts go. Set in an untracked terraform.tfvars, never in the repo."
+  type        = string
+  default     = null
+}
+
+variable "github_repository" {
+  description = "Repository whose workflows may assume the CI roles."
+  type        = string
+  default     = "nephast/compass"
+}
+
+variable "state_bucket" {
+  description = "Terraform state bucket name (same value as backend.tf). Set in terraform.tfvars."
+  type        = string
+}

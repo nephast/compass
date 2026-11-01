@@ -15,3 +15,18 @@ output "log_bucket_name" {
   description = "S3 bucket receiving CloudTrail log files."
   value       = module.cloudtrail.bucket_name
 }
+
+output "ci_plan_role_arn" {
+  description = "Repository secret AWS_CI_PLAN_ROLE_ARN."
+  value       = module.github_oidc.plan_role_arn
+}
+
+output "ci_deploy_role_arn" {
+  description = "Repository secret AWS_CI_ROLE_ARN."
+  value       = module.github_oidc.deploy_role_arn
+}
+
+output "permissions_boundary_arn" {
+  description = "Boundary policy ARN (also in SSM at /compass/account/permissions_boundary_arn)."
+  value       = module.permission_boundary.arn
+}

@@ -91,6 +91,17 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "trail" {
   }
 }
 
+# Versioning (#55, CKV_AWS_21): without it, s3:DeleteObject on a log file is
+# permanent. With it, a delete only adds a delete marker and the object stays
+# recoverable until the noncurrent-version expiry below.
+resource "aws_s3_bucket_versioning" "trail" {
+  bucket = aws_s3_bucket.trail.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
 # Retention is a decision, not an accident. 365 days ~= one audit cycle, and
 # long enough that an intrusion discovered late still has evidence behind it —
 # the failure mode to avoid is a retention window shorter than realistic
@@ -111,6 +122,14 @@ resource "aws_s3_bucket_lifecycle_configuration" "trail" {
 
     expiration {
       days = var.retention_days
+    }
+
+    # Versioning keeps every overwritten or deleted object as a noncurrent
+    # version; without this rule storage would grow forever. 30 days is the
+    # window in which a deletion must be noticed -- the alert below makes that
+    # minutes, not weeks.
+    noncurrent_version_expiration {
+      noncurrent_days = 30
     }
   }
 
@@ -230,4 +249,79 @@ resource "aws_cloudtrail" "main" {
   # validates write access at creation time, and a policy that lands late
   # means a failed first delivery and a backoff before it retries.
   depends_on = [aws_s3_bucket_policy.trail]
+}
+
+# --- Tamper detection (#55) -------------------------------------------------
+
+# The trail is protected from scripted teardown by living in its own state
+# (ADR-0005), but nothing noticed ad-hoc destruction -- which is what actually
+# happened in Aug 2026. This is the detective control: any API call that stops,
+# deletes or narrows the trail publishes to SNS within about a minute.
+#
+# Matched in EventBridge rather than a CloudWatch Logs metric filter because
+# StopLogging produces no log delivery at all after it succeeds -- an alarm on
+# the trail's own output would be watching the thing that just went silent.
+# EventBridge receives the management event from CloudTrail's service-side
+# stream regardless of whether this trail is still logging.
+resource "aws_sns_topic" "trail_tamper" {
+  # checkov:skip=CKV_AWS_26:SNS SSE-KMS would need a CMK whose key policy admits EventBridge; the message is an API-call notification with no secret content.
+  name = "${var.trail_name}-tamper"
+}
+
+data "aws_iam_policy_document" "trail_tamper_topic" {
+  statement {
+    sid       = "EventBridgePublish"
+    actions   = ["sns:Publish"]
+    resources = [aws_sns_topic.trail_tamper.arn]
+    principals {
+      type        = "Service"
+      identifiers = ["events.amazonaws.com"]
+    }
+    condition {
+      test     = "ArnEquals"
+      variable = "aws:SourceArn"
+      values   = [aws_cloudwatch_event_rule.trail_tamper.arn]
+    }
+  }
+}
+
+resource "aws_sns_topic_policy" "trail_tamper" {
+  arn    = aws_sns_topic.trail_tamper.arn
+  policy = data.aws_iam_policy_document.trail_tamper_topic.json
+}
+
+resource "aws_sns_topic_subscription" "trail_tamper_email" {
+  count     = var.alert_email == null ? 0 : 1
+  topic_arn = aws_sns_topic.trail_tamper.arn
+  protocol  = "email"
+  endpoint  = var.alert_email
+}
+
+resource "aws_cloudwatch_event_rule" "trail_tamper" {
+  name        = "${var.trail_name}-tamper"
+  description = "CloudTrail stopped, deleted or reconfigured (#55)"
+  event_pattern = jsonencode({
+    source        = ["aws.cloudtrail"]
+    "detail-type" = ["AWS API Call via CloudTrail"]
+    detail = {
+      eventSource = ["cloudtrail.amazonaws.com"]
+      eventName   = ["StopLogging", "DeleteTrail", "UpdateTrail", "PutEventSelectors"]
+    }
+  })
+}
+
+resource "aws_cloudwatch_event_target" "trail_tamper" {
+  rule = aws_cloudwatch_event_rule.trail_tamper.name
+  arn  = aws_sns_topic.trail_tamper.arn
+
+  input_transformer {
+    input_paths = {
+      event = "$.detail.eventName"
+      who   = "$.detail.userIdentity.arn"
+      key   = "$.detail.userIdentity.accessKeyId"
+      mfa   = "$.detail.userIdentity.sessionContext.attributes.mfaAuthenticated"
+      time  = "$.time"
+    }
+    input_template = "\"CloudTrail <event> by <who> (key <key>, MFA <mfa>) at <time>. If this was not you, re-apply infra/terraform/envs/account and rotate that credential.\""
+  }
 }

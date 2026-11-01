@@ -1,12 +1,26 @@
 # modules/eks
 
-Implements ADR-0003. Build order:
+Implements ADR-0003 and COMPASS-6.
 
-1. EKS cluster control plane in the VPC's private subnets.
-2. OIDC identity provider for the cluster (this is what makes IRSA possible).
-3. Node group (managed, small — e.g. 2x `t3.medium` spot, or on-demand if spot interruptions get annoying during a demo) **or** Fargate profiles for the pods, skipping node management entirely. Decide, then add a follow-up note to ADR-0003 explaining which you picked and why — both are defensible, the point is having a reason.
-4. `aws-auth` ConfigMap (or access entries, the newer EKS API) mapping your IAM user/role to `system:masters` for `kubectl` access.
+| Piece | Choice | Why |
+|---|---|---|
+| Compute | Managed node group, `t3.small` x2 on-demand | Free-Tier-only instance guardrail; NodePort + ASG attachment for the ALB; DaemonSets for Container Insights. See the ADR-0003 follow-up. |
+| Auth | EKS access entries (`authentication_mode = "API"`) | No `aws-auth` ConfigMap to lock yourself out of. CI gets `AmazonEKSEditPolicy` on the `compass` namespace only. |
+| Pod IAM | IRSA via the cluster OIDC provider; **IMDS hop limit 1** | Pods cannot reach the node role at all, so IRSA is enforced rather than advisory. |
+| Secrets | KMS envelope encryption | $1/month. |
+| Add-ons | vpc-cni, kube-proxy, coredns, metrics-server, amazon-cloudwatch-observability | Managed, versioned in plan. metrics-server feeds the HPA. |
 
-**Outputs to expose:** `cluster_name`, `cluster_endpoint`, `oidc_provider_arn`, `cluster_security_group_id`.
+## Access
 
-**Before you build anything on top of this:** confirm `kubectl get nodes` works and note the exact command you ran in `docs/runbooks/local-development.md` — future-you (or an interviewer asking "how do you access this cluster") will want it.
+```bash
+aws eks update-kubeconfig --name compass-dev --region eu-west-1
+kubectl get nodes
+```
+
+The identity that ran `terraform apply` is cluster admin
+(`bootstrap_cluster_creator_admin_permissions`). Anyone else needs an access entry.
+
+## Cost
+
+Control plane **$0.10/hour (~$73/month)** from the moment it exists, plus two
+`t3.small` (~$0.042/hour together). Run `scripts/teardown.sh` at the end of every session.

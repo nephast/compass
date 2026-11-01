@@ -79,3 +79,83 @@ resource "aws_ssm_parameter" "db_connect_policy_arn" {
   type        = "String"
   value       = module.rds.db_connect_policy_arn
 }
+
+# --- Network (COMPASS-5) -----------------------------------------------------
+
+resource "aws_ssm_parameter" "vpc_id" {
+  # checkov:skip=CKV2_AWS_34:Not a secret; SecureString cannot be resolved by CDK at synth time. See header.
+  name  = "/compass/${var.env}/network/vpc_id"
+  type  = "String"
+  value = module.vpc.vpc_id
+}
+
+resource "aws_ssm_parameter" "private_subnet_ids" {
+  # checkov:skip=CKV2_AWS_34:Not a secret; SecureString cannot be resolved by CDK at synth time. See header.
+  name  = "/compass/${var.env}/network/private_subnet_ids"
+  type  = "StringList"
+  value = join(",", module.vpc.private_subnet_ids)
+}
+
+# --- EKS (COMPASS-6) ---------------------------------------------------------
+
+resource "aws_ssm_parameter" "eks_cluster_name" {
+  # checkov:skip=CKV2_AWS_34:Not a secret; SecureString cannot be resolved by CDK at synth time. See header.
+  name  = "/compass/${var.env}/eks/cluster_name"
+  type  = "String"
+  value = module.eks.cluster_name
+}
+
+resource "aws_ssm_parameter" "eks_oidc_provider_arn" {
+  # checkov:skip=CKV2_AWS_34:Not a secret; SecureString cannot be resolved by CDK at synth time. See header.
+  name        = "/compass/${var.env}/eks/oidc_provider_arn"
+  description = "Federated principal for IRSA trust policies (CDK creates the pod roles)"
+  type        = "String"
+  value       = module.eks.oidc_provider_arn
+}
+
+resource "aws_ssm_parameter" "eks_oidc_issuer" {
+  # checkov:skip=CKV2_AWS_34:Not a secret; SecureString cannot be resolved by CDK at synth time. See header.
+  name  = "/compass/${var.env}/eks/oidc_issuer"
+  type  = "String"
+  value = module.eks.oidc_issuer
+}
+
+# --- Ingress (COMPASS-18) ----------------------------------------------------
+
+resource "aws_ssm_parameter" "ingress_listener_arn" {
+  # checkov:skip=CKV2_AWS_34:Not a secret; SecureString cannot be resolved by CDK at synth time. See header.
+  name        = "/compass/${var.env}/ingress/listener_arn"
+  description = "Internal ALB listener the API Gateway VPC Link targets"
+  type        = "String"
+  value       = module.ingress.listener_arn
+}
+
+resource "aws_ssm_parameter" "ingress_vpc_link_sg" {
+  # checkov:skip=CKV2_AWS_34:Not a secret; SecureString cannot be resolved by CDK at synth time. See header.
+  name  = "/compass/${var.env}/ingress/vpc_link_security_group_id"
+  type  = "String"
+  value = module.ingress.vpc_link_security_group_id
+}
+
+resource "aws_ssm_parameter" "ingress_alb_arn_suffix" {
+  # checkov:skip=CKV2_AWS_34:Not a secret; SecureString cannot be resolved by CDK at synth time. See header.
+  name  = "/compass/${var.env}/ingress/alb_arn_suffix"
+  type  = "String"
+  value = module.ingress.alb_arn_suffix
+}
+
+resource "aws_ssm_parameter" "ingress_tg_arn_suffix" {
+  # checkov:skip=CKV2_AWS_34:Not a secret; SecureString cannot be resolved by CDK at synth time. See header.
+  name  = "/compass/${var.env}/ingress/target_group_arn_suffix"
+  type  = "String"
+  value = module.ingress.target_group_arn_suffix
+}
+
+# --- ECR (COMPASS-7) ---------------------------------------------------------
+
+resource "aws_ssm_parameter" "ecr_registry" {
+  # checkov:skip=CKV2_AWS_34:Not a secret; SecureString cannot be resolved by CDK at synth time. See header.
+  name  = "/compass/${var.env}/ecr/registry"
+  type  = "String"
+  value = module.ecr.registry
+}

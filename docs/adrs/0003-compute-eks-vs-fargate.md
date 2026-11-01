@@ -53,3 +53,25 @@ Normally the honest engineering answer for a workload this size is Fargate — l
 3. [ ] AWS Budgets: $10/$25/$50/$90 thresholds against the $100 credit, SNS → email.
 4. [ ] `scripts/teardown.sh` must fully delete the EKS cluster (not just scale nodes to 0) — verify this explicitly, since the control plane bills independently of node count.
 5. [ ] Start-of-session checklist item: check AWS Budgets before doing any new work (see `docs/PROGRAM.md` Epic 0).
+
+## Follow-up note (2026-11-01): managed node group, not Fargate profiles
+
+Decided for COMPASS-6 (`infra/terraform/modules/eks`): **one managed node group,
+2 × `t3.small`, on-demand**, IMDS hop limit 1.
+
+- **Ingress shape.** The internal ALB reaches the api through a NodePort on the node
+  group's Auto Scaling group (`modules/ingress`). Fargate pods only take IP targets,
+  which needs the AWS Load Balancer Controller — one more in-cluster component, and
+  an ALB Terraform cannot see or publish to SSM for CDK's VPC Link.
+- **DaemonSets.** Container Insights and Fluent Bit (COMPASS-29/30) run as DaemonSets,
+  which Fargate does not support.
+- **Cost.** Two `t3.small` cost ~$30/month on-demand; Fargate for four small pods
+  (0.25 vCPU / 0.5 GiB each) is similar, so cost does not decide it.
+- **Instance type.** `t3.small` because the account enforces Free-Tier-eligible
+  instance types (see `modules/vpc`). 11 pods per node is the binding limit; two
+  nodes fit two replicas of each service plus system pods.
+- **IRSA is enforced, not advisory.** Hop limit 1 means no pod can reach the node
+  role through IMDS, so a pod's only AWS identity is its service account's role.
+
+Action items 1, 2 and 4 above are done by this change; 4 is the `scripts/teardown.sh`
+ordering, which destroys the cluster (not just its nodes).

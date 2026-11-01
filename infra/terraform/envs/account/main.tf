@@ -9,4 +9,30 @@
 
 module "cloudtrail" {
   source = "../../modules/cloudtrail"
+
+  alert_email = var.alert_email
+}
+
+# Account-lifetime for the same reason as the trail: CI must be able to deploy
+# the morning after a teardown, and a boundary that is destroyed with dev
+# would leave every recreated role briefly unbounded.
+module "permission_boundary" {
+  source = "../../modules/permission-boundary"
+}
+
+module "github_oidc" {
+  source = "../../modules/github-oidc"
+
+  repository               = var.github_repository
+  permissions_boundary_arn = module.permission_boundary.arn
+  state_bucket             = var.state_bucket
+}
+
+# Published for envs/dev and CDK, which both create roles that must carry it.
+resource "aws_ssm_parameter" "permissions_boundary_arn" {
+  # checkov:skip=CKV2_AWS_34:Not a secret; SecureString cannot be resolved by CDK at synth time.
+  name        = "/compass/account/permissions_boundary_arn"
+  description = "Permissions boundary every Compass role must carry (COMPASS-8)"
+  type        = "String"
+  value       = module.permission_boundary.arn
 }
