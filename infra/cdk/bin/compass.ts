@@ -1,5 +1,7 @@
 import { App, Aspects, Tags, type AppProps } from "aws-cdk-lib";
 import { BOUNDARY_NAME, BoundaryOnRawRoles } from "../lib/boundary.js";
+import { ApiStack } from "../lib/api-stack.js";
+import { AuthStack } from "../lib/auth-stack.js";
 import { EdgeWafStack } from "../lib/edge-waf-stack.js";
 import { FrontendStack } from "../lib/frontend-stack.js";
 import { IngestionStack } from "../lib/ingestion-stack.js";
@@ -41,7 +43,18 @@ export function buildApp(props: AppProps = {}): App {
   const siteUrl = `https://${frontend.distribution.distributionDomainName}`;
   const corsOrigins = [siteUrl, "http://localhost:3000"];
 
-  new IngestionStack(app, `${prefix}-Ingestion`, { env, envName, corsOrigins });
+  const auth = new AuthStack(app, `${prefix}-Auth`, { env, envName, siteUrl });
+
+  const ingestion = new IngestionStack(app, `${prefix}-Ingestion`, { env, envName, corsOrigins });
+
+  new ApiStack(app, `${prefix}-Api`, {
+    env,
+    envName,
+    corsOrigins,
+    userPool: auth.userPool,
+    clientIds: [auth.webClient.userPoolClientId, auth.smokeClient.userPoolClientId],
+    documentsBucket: ingestion.documentsBucket,
+  });
 
   Aspects.of(app).add(new BoundaryOnRawRoles());
 

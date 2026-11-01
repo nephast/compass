@@ -85,6 +85,48 @@ describe("frontend (COMPASS-24, COMPASS-32)", () => {
       ]),
     });
   });
+
+});
+
+describe("auth (COMPASS-15)", () => {
+  it("issues short-lived, revocable tokens via code+PKCE only", () => {
+    t("Auth").hasResourceProperties("AWS::Cognito::UserPoolClient", {
+      ClientName: "web",
+      GenerateSecret: false,
+      AllowedOAuthFlows: ["code"],
+      AccessTokenValidity: 15,
+      EnableTokenRevocation: true,
+    });
+  });
+});
+
+describe("api edge (COMPASS-16)", () => {
+  it("guards every route with the JWT authorizer except /healthz", () => {
+    const routes = t("Api").findResources("AWS::ApiGatewayV2::Route");
+    const byKey = Object.fromEntries(
+      Object.values(routes).map((r) => [
+        r.Properties.RouteKey,
+        r.Properties.AuthorizationType ?? "NONE",
+      ]),
+    );
+    expect(byKey["GET /healthz"]).toBe("NONE");
+    for (const [key, auth] of Object.entries(byKey)) {
+      if (key !== "GET /healthz" && !key.startsWith("OPTIONS")) expect(auth, key).toBe("JWT");
+    }
+  });
+
+  it("throttles the stage (HTTP APIs cannot take WAF)", () => {
+    t("Api").hasResourceProperties("AWS::ApiGatewayV2::Stage", {
+      DefaultRouteSettings: { ThrottlingRateLimit: 20, ThrottlingBurstLimit: 40 },
+    });
+  });
+
+  it("trusts each IRSA role to exactly one service account", () => {
+    const roles = Object.values(t("Api").findResources("AWS::IAM::Role")).filter((r) =>
+      JSON.stringify(r.Properties.AssumeRolePolicyDocument).includes("AssumeRoleWithWebIdentity"),
+    );
+    expect(roles).toHaveLength(2);
+  });
 });
 
 describe("ingestion (COMPASS-9..12)", () => {
