@@ -58,6 +58,35 @@ describe("account hygiene", () => {
   });
 });
 
+describe("frontend (COMPASS-24, COMPASS-32)", () => {
+  it("serves a private bucket through CloudFront OAC with WAF attached", () => {
+    t("Frontend").hasResourceProperties("AWS::S3::Bucket", {
+      PublicAccessBlockConfiguration: {
+        BlockPublicAcls: true,
+        BlockPublicPolicy: true,
+        IgnorePublicAcls: true,
+        RestrictPublicBuckets: true,
+      },
+    });
+    t("Frontend").resourceCountIs("AWS::CloudFront::OriginAccessControl", 1);
+    t("Frontend").hasResourceProperties("AWS::CloudFront::Distribution", {
+      DistributionConfig: Match.objectLike({ WebACLId: Match.anyValue() }),
+    });
+  });
+
+  it("rate-limits per IP and runs the AWS common rule set", () => {
+    t("EdgeWaf").hasResourceProperties("AWS::WAFv2::WebACL", {
+      Scope: "CLOUDFRONT",
+      Rules: Match.arrayWith([
+        Match.objectLike({
+          Statement: { RateBasedStatement: Match.objectLike({ AggregateKeyType: "IP" }) },
+        }),
+        Match.objectLike({ Name: "aws-common-rule-set" }),
+      ]),
+    });
+  });
+});
+
 describe("ingestion (COMPASS-9..12)", () => {
   it("routes only uploads/ ObjectCreated events to the state machine", () => {
     t("Ingestion").hasResourceProperties("AWS::Events::Rule", {
