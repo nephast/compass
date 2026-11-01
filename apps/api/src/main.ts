@@ -1,9 +1,9 @@
-import { S3Client } from "@aws-sdk/client-s3";
 import { completionProviderFromEnv, embeddingProviderFromEnv } from "@compass/llm";
 import { createPool } from "@compass/pg";
 import { logger } from "@compass/telemetry";
 import { createAgentClient } from "./agent-client.js";
 import { createAuthenticator } from "./auth.js";
+import { createS3Client } from "./uploads.js";
 import { loadConfig } from "./config.js";
 import { buildServer } from "./server.js";
 
@@ -14,16 +14,7 @@ const pool = createPool(process.env, { max: 5 });
 const app = buildServer({
   config,
   pool,
-  s3: new S3Client(
-    localstack
-      ? {
-          region: process.env.AWS_REGION ?? "eu-west-1",
-          endpoint: localstack,
-          forcePathStyle: true,
-          credentials: { accessKeyId: "test", secretAccessKey: "test" },
-        }
-      : {},
-  ),
+  s3: createS3Client(localstack),
   embedder: embeddingProviderFromEnv(),
   completer: completionProviderFromEnv(),
   authenticate: createAuthenticator(config),

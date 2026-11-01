@@ -33,7 +33,9 @@ export function parseTraceparent(header: string | undefined): TraceContext | nul
 
 /** A 32-hex trace id derived deterministically from any request id string. */
 export function traceIdFromRequestId(requestId: string): string {
-  const hex = Buffer.from(requestId).toString("hex").replace(/[^0-9a-f]/g, "");
+  const hex = Buffer.from(requestId)
+    .toString("hex")
+    .replace(/[^0-9a-f]/g, "");
   return (hex + "0".repeat(32)).slice(0, 32);
 }
 

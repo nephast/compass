@@ -62,6 +62,18 @@ export function buildServer(deps: ApiDeps): FastifyInstance {
     enterLogContext({ traceId: request.trace.traceId, requestId: request.id });
   });
 
+  // In AWS, API Gateway answers CORS preflights (infra/cdk ApiStack) and the
+  // service never sees them. Locally the browser talks to this process
+  // directly, so dev mode -- and only dev mode -- answers for localhost:3000.
+  if (deps.config.authMode === "dev") {
+    app.addHook("onRequest", async (request, reply) => {
+      void reply.header("access-control-allow-origin", "http://localhost:3000");
+      void reply.header("access-control-allow-headers", "content-type, x-dev-user, traceparent");
+      void reply.header("access-control-allow-methods", "GET, POST, OPTIONS");
+      if (request.method === "OPTIONS") return reply.status(204).send();
+    });
+  }
+
   const publicRoutes = new Set(["/healthz"]);
   app.addHook("preHandler", async (request) => {
     if (publicRoutes.has(request.routeOptions.url ?? "")) return;
@@ -74,7 +86,7 @@ export function buildServer(deps: ApiDeps): FastifyInstance {
   // cardinality), status, duration. Health checks are skipped -- at one probe
   // every few seconds per pod they would be most of the log volume and bill.
   app.addHook("onResponse", async (request, reply) => {
-    if (request.routeOptions.url === "/healthz") return;
+    if (request.routeOptions.url === "/healthz" || request.method === "OPTIONS") return;
     logger.info("request completed", {
       method: request.method,
       route: request.routeOptions.url ?? "unmatched",

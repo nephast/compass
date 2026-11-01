@@ -21,6 +21,9 @@ export function buildApp(props: AppProps = {}): App {
     context: {
       ...props.context,
       "@aws-cdk/core:permissionsBoundary": { name: BOUNDARY_NAME },
+      // Strong exports: CloudFormation refuses to delete a value another stack
+      // still imports. Explicit, so tests and the CLI behave the same.
+      "@aws-cdk/core:defaultCrossStackReferences": "strong",
     },
   });
   // One stack set per environment: `cdk deploy --all --context env=dev`.
@@ -38,7 +41,7 @@ export function buildApp(props: AppProps = {}): App {
   });
 
   const frontend = new FrontendStack(app, `${prefix}-Frontend`, { env, envName });
-  frontend.addDependency(waf, "reads the web ACL ARN the WAF stack publishes");
+  frontend.addStackDependency(waf, "reads the web ACL ARN the WAF stack publishes");
   const siteUrl = `https://${frontend.distribution.distributionDomainName}`;
   const corsOrigins = [siteUrl, "http://localhost:3000"];
 

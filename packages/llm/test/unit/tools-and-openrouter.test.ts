@@ -157,3 +157,29 @@ describe("provider selection", () => {
     );
   });
 });
+
+describe("FakeCompletionProvider on a grounded RAG prompt", () => {
+  const system =
+    "Use only the passages.\nIf the passages do not contain the answer, reply with exactly: Not here.";
+  const prompt =
+    'Passages:\n\n[1] (from "a.md")\nThe sky is blue. Rollbacks use kubectl rollout undo.\n\n---\n\n' +
+    '[2] (from "b.md")\nCats sleep a lot.\n\n---\n\nQuestion: ';
+
+  it("quotes the best-matching sentence with its citation", async () => {
+    const { FakeCompletionProvider } = await import("../../src/index.js");
+    const result = await new FakeCompletionProvider().complete({
+      system,
+      messages: [{ role: "user", content: `${prompt}how do rollbacks work with kubectl?` }],
+    });
+    expect(result.text).toBe("Rollbacks use kubectl rollout undo. [1]");
+  });
+
+  it("returns the system prompt's refusal when nothing overlaps", async () => {
+    const { FakeCompletionProvider } = await import("../../src/index.js");
+    const result = await new FakeCompletionProvider().complete({
+      system,
+      messages: [{ role: "user", content: `${prompt}quantum lasagne?` }],
+    });
+    expect(result.text).toBe("Not here.");
+  });
+});

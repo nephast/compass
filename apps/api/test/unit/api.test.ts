@@ -1,4 +1,3 @@
-import { S3Client } from "@aws-sdk/client-s3";
 import { FakeCompletionProvider, FakeEmbeddingProvider } from "@compass/llm";
 import type { Pool } from "@compass/pg";
 import { describe, expect, it } from "vitest";
@@ -6,7 +5,12 @@ import { Unauthorized, createAuthenticator } from "../../src/auth.js";
 import { loadConfig, type ApiConfig } from "../../src/config.js";
 import { buildPrompt, citedNumbers } from "../../src/rag.js";
 import { buildServer } from "../../src/server.js";
-import { buildUploadKey, sanitiseFileName, validateUpload } from "../../src/uploads.js";
+import {
+  buildUploadKey,
+  createS3Client,
+  sanitiseFileName,
+  validateUpload,
+} from "../../src/uploads.js";
 
 const config: ApiConfig = {
   port: 0,
@@ -22,10 +26,7 @@ function app(overrides: Partial<Parameters<typeof buildServer>[0]> = {}) {
   return buildServer({
     config,
     pool: {} as Pool,
-    s3: new S3Client({
-      region: "eu-west-1",
-      credentials: { accessKeyId: "test", secretAccessKey: "test" },
-    }),
+    s3: createS3Client("http://localhost:4566"),
     embedder: new FakeEmbeddingProvider(),
     completer: new FakeCompletionProvider(),
     authenticate: createAuthenticator(config),
@@ -140,6 +141,9 @@ describe("http surface", () => {
     const body = response.json();
     expect(body.key).toMatch(/^uploads\/user-1\/[0-9a-f-]{36}\/Runbook\.md$/);
     expect(body.url).toContain("X-Amz-SignedHeaders=content-length%3Bcontent-type%3Bhost");
+    // No checksum of the (empty) body at signing time -- S3 would reject the
+    // real upload against it. See createS3Client.
+    expect(body.url).not.toMatch(/x-amz-checksum|x-amz-sdk-checksum/i);
   });
 
   it("forwards agent messages with the caller", async () => {

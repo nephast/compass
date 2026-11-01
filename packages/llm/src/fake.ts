@@ -74,7 +74,17 @@ export class FakeEmbeddingProvider implements EmbeddingProvider {
   }
 }
 
-/** Deterministic and offline: echoes the last user message with a marker. */
+/**
+ * Deterministic and offline. Two behaviours:
+ *
+ * - Given a grounded RAG prompt (numbered "[n]" passages and a "Question:"
+ *   line), it answers EXTRACTIVELY: the passage sentence sharing the most
+ *   words with the question, cited with its passage number. If nothing
+ *   overlaps, it returns the refusal sentence the system prompt names. This
+ *   makes the local stack and the demo behave like the real flow -- cited
+ *   answers, honest "not found" -- with no model at all.
+ * - Anything else is echoed with a marker.
+ */
 export class FakeCompletionProvider implements CompletionProvider {
   constructor(private readonly model: string = FAKE_COMPLETION_MODEL) {}
 
@@ -82,7 +92,7 @@ export class FakeCompletionProvider implements CompletionProvider {
     const lastUserMessage = [...request.messages].reverse().find((m) => m.role === "user");
     const prompt = lastUserMessage?.content ?? "";
     const inputTokens = request.messages.reduce((sum, m) => sum + tokenize(m.content).length, 0);
-    const text = `[fake] ${prompt}`;
+    const text = extractiveAnswer(prompt, request.system) ?? `[fake] ${prompt}`;
 
     return {
       model: this.model,
@@ -90,6 +100,37 @@ export class FakeCompletionProvider implements CompletionProvider {
       usage: { inputTokens, outputTokens: tokenize(text).length },
     };
   }
+}
+
+const STOPWORDS = new Set(
+  "a an and are as at be by do does for from how i in is it of on or the to what when where which who why with you your my can".split(
+    " ",
+  ),
+);
+
+function extractiveAnswer(prompt: string, system: string | undefined): string | null {
+  const question = /\nQuestion: (.+)$/s.exec(prompt)?.[1];
+  if (!question || !prompt.startsWith("Passages:")) return null;
+
+  const wanted = new Set(tokenize(question).filter((t) => !STOPWORDS.has(t)));
+  let best: { n: string; sentence: string; score: number } | null = null;
+  for (const block of prompt.split(/\n---\n/)) {
+    const header = /\[(\d+)\][^\n]*\n([\s\S]*)/.exec(block);
+    if (!header) continue;
+    // Lines as well as sentences, so a Markdown heading is its own candidate
+    // instead of being glued to the first sentence under it.
+    for (const sentence of (header[2] ?? "").split(/(?<=[.!?])\s+|\n+/)) {
+      if (/^\s*#/.test(sentence)) continue;
+      const score = tokenize(sentence).filter((t) => wanted.has(t)).length;
+      if (!best || score > best.score)
+        best = { n: header[1] ?? "1", sentence: sentence.trim(), score };
+    }
+  }
+
+  if (!best || best.score === 0) {
+    return /reply with exactly: (.+)$/m.exec(system ?? "")?.[1]?.trim() ?? "[fake] no answer found";
+  }
+  return `${best.sentence} [${best.n}]`;
 }
 
 export const FAKE_TOOL_MODEL = "fake-keyword-router";

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { PutObjectCommand, type S3Client } from "@aws-sdk/client-s3";
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 // The presigned PUT is the only way a document enters the system, and its key
@@ -62,4 +62,26 @@ export async function presignUpload(
       signableHeaders: new Set(["content-length", "content-type"]),
     },
   );
+}
+
+/**
+ * The S3 client that signs upload URLs. `requestChecksumCalculation:
+ * "WHEN_REQUIRED"` is load-bearing: since SDK 3.729 the default adds a CRC32
+ * checksum to every PutObject -- and in a PRESIGNED URL that is the checksum
+ * of the empty body present at signing time, so S3 rejects the browser's real
+ * upload ("Value for x-amz-checksum-crc32 header is invalid"). Caught by
+ * driving the local stack with a browser; asserted in test/unit/api.test.ts.
+ */
+export function createS3Client(localstackEndpoint?: string): S3Client {
+  return new S3Client({
+    requestChecksumCalculation: "WHEN_REQUIRED",
+    ...(localstackEndpoint
+      ? {
+          region: process.env.AWS_REGION ?? "eu-west-1",
+          endpoint: localstackEndpoint,
+          forcePathStyle: true,
+          credentials: { accessKeyId: "test", secretAccessKey: "test" },
+        }
+      : {}),
+  });
 }

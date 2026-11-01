@@ -105,7 +105,6 @@ export class FrontendStack extends Stack {
         { httpStatus: 403, responseHttpStatus: 404, responsePagePath: "/404.html" },
         { httpStatus: 404, responseHttpStatus: 404, responsePagePath: "/404.html" },
       ],
-      minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
       priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
       webAclId: webAcl.getResponseField("Parameter.Value"),
     });
