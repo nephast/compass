@@ -86,6 +86,11 @@ describe("frontend (COMPASS-24, COMPASS-32)", () => {
     });
   });
 
+  it("invalidates CloudFront as part of the deploy", () => {
+    t("Site").hasResourceProperties("Custom::CDKBucketDeployment", {
+      DistributionPaths: ["/*"],
+    });
+  });
 });
 
 describe("auth (COMPASS-15)", () => {

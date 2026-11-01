@@ -5,6 +5,7 @@ import { AuthStack } from "../lib/auth-stack.js";
 import { EdgeWafStack } from "../lib/edge-waf-stack.js";
 import { FrontendStack } from "../lib/frontend-stack.js";
 import { IngestionStack } from "../lib/ingestion-stack.js";
+import { SiteStack } from "../lib/site-stack.js";
 
 // COMPASS-8 on the CDK side: every IAM role in every stack -- including the
 // ones CDK creates for its own custom resources (bucket auto-delete,
@@ -47,13 +48,28 @@ export function buildApp(props: AppProps = {}): App {
 
   const ingestion = new IngestionStack(app, `${prefix}-Ingestion`, { env, envName, corsOrigins });
 
-  new ApiStack(app, `${prefix}-Api`, {
+  const api = new ApiStack(app, `${prefix}-Api`, {
     env,
     envName,
     corsOrigins,
     userPool: auth.userPool,
     clientIds: [auth.webClient.userPoolClientId, auth.smokeClient.userPoolClientId],
     documentsBucket: ingestion.documentsBucket,
+  });
+
+  new SiteStack(app, `${prefix}-Site`, {
+    env,
+    bucket: frontend.bucket,
+    distribution: frontend.distribution,
+    // Public by nature -- shipped to every browser. Not secrets.
+    config: {
+      apiUrl: api.httpApi.apiEndpoint,
+      region,
+      userPoolId: auth.userPool.userPoolId,
+      clientId: auth.webClient.userPoolClientId,
+      authDomain: `${auth.domain.domainName}.auth.${region}.amazoncognito.com`,
+      env: envName,
+    },
   });
 
   Aspects.of(app).add(new BoundaryOnRawRoles());
