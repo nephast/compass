@@ -71,7 +71,9 @@ export class FrontendStack extends Stack {
         physicalResourceId: cr.PhysicalResourceId.of(`${parameterName}-${Date.now()}`),
       },
       policy: cr.AwsCustomResourcePolicy.fromSdkCalls({
-        resources: [`arn:${this.partition}:ssm:us-east-1:${this.account}:parameter${parameterName}`],
+        resources: [
+          `arn:${this.partition}:ssm:us-east-1:${this.account}:parameter${parameterName}`,
+        ],
       }),
       installLatestAwsSdk: false,
     });

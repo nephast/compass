@@ -14,7 +14,9 @@ export function bedrockInvokeStatement(
   const { account, partition, region } = Stack.of(scope);
   const resources: string[] = [];
   if (use.embeddings) {
-    resources.push(`arn:${partition}:bedrock:${region}::foundation-model/amazon.titan-embed-text-v2:0`);
+    resources.push(
+      `arn:${partition}:bedrock:${region}::foundation-model/amazon.titan-embed-text-v2:0`,
+    );
   }
   if (use.completions) {
     resources.push(

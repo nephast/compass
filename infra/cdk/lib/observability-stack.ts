@@ -29,7 +29,7 @@ export class ObservabilityStack extends Stack {
     id: string,
     props: StackProps & {
       envName: string;
-     
+
       httpApi: apigw.IHttpApi;
       apiAccessLogs: logs.ILogGroup;
       stateMachine: sfn.IStateMachine;
@@ -45,7 +45,8 @@ export class ObservabilityStack extends Stack {
 
     const topic = new sns.Topic(this, "Alarms", { topicName: `compass-${envName}-alarms` });
     // Never committed: passed as -c alertEmail=... or ALERT_EMAIL at deploy.
-    if (props.alertEmail) topic.addSubscription(new subscriptions.EmailSubscription(props.alertEmail));
+    if (props.alertEmail)
+      topic.addSubscription(new subscriptions.EmailSubscription(props.alertEmail));
     const notify = new actions.SnsAction(topic);
 
     // --- Metrics ------------------------------------------------------------
@@ -118,7 +119,11 @@ export class ObservabilityStack extends Stack {
       }),
       new cw.GraphWidget({
         title: "API latency (ms)",
-        left: [apiMetric("Latency", "p50"), apiMetric("Latency", "p90"), apiMetric("Latency", "p99")],
+        left: [
+          apiMetric("Latency", "p50"),
+          apiMetric("Latency", "p90"),
+          apiMetric("Latency", "p99"),
+        ],
         width: 6,
       }),
       new cw.LogQueryWidget({
@@ -126,9 +131,9 @@ export class ObservabilityStack extends Stack {
         logGroupNames: [appLogGroup],
         queryLines: [
           "filter kubernetes.container_name = 'api'",
-          "parse log '\"route\":\"*\"' as route",
+          'parse log \'"route":"*"\' as route',
           "parse log '\"status\":*,' as status",
-          "parse log '\"message\":\"*\"' as message",
+          'parse log \'"message":"*"\' as message',
           "filter status >= 500 or message = 'request failed'",
           "stats count(*) as failures by route, status, message",
           "sort failures desc",
@@ -178,8 +183,8 @@ export class ObservabilityStack extends Stack {
         logGroupNames: [appLogGroup],
         queryLines: [
           "filter kubernetes.container_name = 'agent-tools'",
-          "parse log '\"tool\":\"*\"' as tool",
-          "parse log '\"status\":\"*\"' as status",
+          'parse log \'"tool":"*"\' as tool',
+          'parse log \'"status":"*"\' as status',
           "filter ispresent(tool)",
           "stats count(*) as calls by tool, status",
         ],
@@ -195,7 +200,10 @@ export class ObservabilityStack extends Stack {
 
     // --- Alarms (COMPASS-30) -------------------------------------------------
 
-    const alarm = (id: string, props: cw.CreateAlarmOptions & { metric: cw.Metric | cw.MathExpression }) => {
+    const alarm = (
+      id: string,
+      props: cw.CreateAlarmOptions & { metric: cw.Metric | cw.MathExpression },
+    ) => {
       const created = props.metric.createAlarm(this, id, {
         treatMissingData: cw.TreatMissingData.NOT_BREACHING,
         ...props,
@@ -217,7 +225,8 @@ export class ObservabilityStack extends Stack {
 
     alarm("IngestLambdaErrors", {
       alarmName: `compass-${envName}-ingest-lambda-errors`,
-      alarmDescription: "The ingest Lambda threw in 2 consecutive 5-minute windows (usually Bedrock throttling or the database).",
+      alarmDescription:
+        "The ingest Lambda threw in 2 consecutive 5-minute windows (usually Bedrock throttling or the database).",
       metric: props.ingestFunction.metricErrors({ period: window }),
       threshold: 0,
       comparisonOperator: cw.ComparisonOperator.GREATER_THAN_THRESHOLD,
@@ -226,7 +235,8 @@ export class ObservabilityStack extends Stack {
 
     alarm("Api5xxRate", {
       alarmName: `compass-${envName}-api-5xx-rate`,
-      alarmDescription: "More than 5% of API requests returned 5xx for 10 minutes. Dashboard: 'Failed requests, last hour'.",
+      alarmDescription:
+        "More than 5% of API requests returned 5xx for 10 minutes. Dashboard: 'Failed requests, last hour'.",
       metric: errorRate,
       threshold: 5,
       comparisonOperator: cw.ComparisonOperator.GREATER_THAN_THRESHOLD,

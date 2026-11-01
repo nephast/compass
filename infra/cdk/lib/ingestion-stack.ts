@@ -1,6 +1,6 @@
 import path from "node:path";
-import { Annotations, fileURLToPath } from "node:url";
-import { Duration, RemovalPolicy, Stack, type StackProps } from "aws-cdk-lib";
+import { fileURLToPath } from "node:url";
+import { Annotations, Duration, RemovalPolicy, Stack, type StackProps } from "aws-cdk-lib";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as events from "aws-cdk-lib/aws-events";
 import * as targets from "aws-cdk-lib/aws-events-targets";

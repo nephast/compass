@@ -29,7 +29,7 @@ export class ApiStack extends Stack {
     id: string,
     props: StackProps & {
       envName: string;
-     
+
       userPool: cognito.IUserPool;
       clientIds: string[];
       documentsBucket: s3.IBucket;

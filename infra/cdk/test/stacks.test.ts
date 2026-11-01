@@ -76,7 +76,9 @@ describe("frontend (COMPASS-24, COMPASS-32)", () => {
     t("EdgeWaf").hasResourceProperties("AWS::WAFv2::WebACL", {
       Scope: "CLOUDFRONT",
       Rules: Match.arrayWith([
-        Match.objectLike({ Statement: { RateBasedStatement: Match.objectLike({ AggregateKeyType: "IP" }) } }),
+        Match.objectLike({
+          Statement: { RateBasedStatement: Match.objectLike({ AggregateKeyType: "IP" }) },
+        }),
         Match.objectLike({ Name: "aws-common-rule-set" }),
       ]),
     });
@@ -105,7 +107,10 @@ describe("api edge (COMPASS-16)", () => {
   it("guards every route with the JWT authorizer except /healthz", () => {
     const routes = t("Api").findResources("AWS::ApiGatewayV2::Route");
     const byKey = Object.fromEntries(
-      Object.values(routes).map((r) => [r.Properties.RouteKey, r.Properties.AuthorizationType ?? "NONE"]),
+      Object.values(routes).map((r) => [
+        r.Properties.RouteKey,
+        r.Properties.AuthorizationType ?? "NONE",
+      ]),
     );
     expect(byKey["GET /healthz"]).toBe("NONE");
     for (const [key, auth] of Object.entries(byKey)) {
@@ -120,8 +125,8 @@ describe("api edge (COMPASS-16)", () => {
   });
 
   it("trusts each IRSA role to exactly one service account", () => {
-    const roles = Object.values(t("Api").findResources("AWS::IAM::Role")).filter(
-      (r) => JSON.stringify(r.Properties.AssumeRolePolicyDocument).includes("AssumeRoleWithWebIdentity"),
+    const roles = Object.values(t("Api").findResources("AWS::IAM::Role")).filter((r) =>
+      JSON.stringify(r.Properties.AssumeRolePolicyDocument).includes("AssumeRoleWithWebIdentity"),
     );
     expect(roles).toHaveLength(2);
   });
@@ -141,7 +146,9 @@ describe("ingestion (COMPASS-9..12)", () => {
     t("Ingestion").hasResourceProperties("AWS::Lambda::Function", {
       VpcConfig: Match.objectLike({ SubnetIds: Match.anyValue() }),
       ReservedConcurrentExecutions: 5,
-      Environment: { Variables: Match.objectLike({ DB_SSL_ROOT_CERT: "/var/runtime/ca-cert.pem" }) },
+      Environment: {
+        Variables: Match.objectLike({ DB_SSL_ROOT_CERT: "/var/runtime/ca-cert.pem" }),
+      },
     });
   });
 });

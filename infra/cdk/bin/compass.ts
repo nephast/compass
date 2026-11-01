@@ -78,7 +78,8 @@ export function buildApp(props: AppProps = {}): App {
     stateMachine: ingestion.stateMachine,
     ingestFunction: ingestion.ingestFunction,
     ingestLogGroup: ingestion.ingestLogGroup,
-    alertEmail: (app.node.tryGetContext("alertEmail") as string | undefined) ?? process.env.ALERT_EMAIL,
+    alertEmail:
+      (app.node.tryGetContext("alertEmail") as string | undefined) ?? process.env.ALERT_EMAIL,
   });
 
   Aspects.of(app).add(new BoundaryOnRawRoles());
