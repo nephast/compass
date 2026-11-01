@@ -264,3 +264,42 @@ resource "aws_vpc_endpoint" "s3" {
   vpc_endpoint_type = "Gateway"
   route_table_ids   = [aws_route_table.private_a.id, aws_route_table.private_b.id]
 }
+
+# --- Interface endpoints (optional) ------------------------------------------
+
+# ECR (api + dkr), CloudWatch Logs and Secrets Manager: the four services EKS
+# nodes and pods need that would otherwise leave via the NAT instance. They
+# make the NAT instance non-critical for image pulls, which is ADR-0001's
+# resilience argument -- but each bills per AZ per hour: 4 x 2 x $0.011/h is
+# roughly $64/month, most of what EKS's control plane costs again. Off by
+# default on the $100 credit; flip on to prove the "pull still works with the
+# NAT route removed" test from COMPASS-5, then flip off.
+resource "aws_security_group" "endpoints" {
+  count       = var.enable_interface_endpoints ? 1 : 0
+  name_prefix = "compass-${var.env}-endpoints-"
+  description = "Interface endpoints, HTTPS from the private subnets"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    description = "HTTPS from private subnets"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = var.private_subnet_cidrs
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_vpc_endpoint" "interface" {
+  for_each = var.enable_interface_endpoints ? toset(["ecr.api", "ecr.dkr", "logs", "secretsmanager"]) : toset([])
+
+  vpc_id              = aws_vpc.main.id
+  service_name        = "com.amazonaws.${data.aws_region.current.region}.${each.value}"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = [aws_subnet.private_a.id, aws_subnet.private_b.id]
+  security_group_ids  = [aws_security_group.endpoints[0].id]
+  private_dns_enabled = true
+}
