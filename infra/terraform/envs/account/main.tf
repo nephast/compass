@@ -9,4 +9,6 @@
 
 module "cloudtrail" {
   source = "../../modules/cloudtrail"
+
+  alert_email = var.alert_email
 }
