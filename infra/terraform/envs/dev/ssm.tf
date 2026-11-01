@@ -79,3 +79,12 @@ resource "aws_ssm_parameter" "db_connect_policy_arn" {
   type        = "String"
   value       = module.rds.db_connect_policy_arn
 }
+
+# --- ECR (COMPASS-7) ---------------------------------------------------------
+
+resource "aws_ssm_parameter" "ecr_registry" {
+  # checkov:skip=CKV2_AWS_34:Not a secret; SecureString cannot be resolved by CDK at synth time. See header.
+  name  = "/compass/${var.env}/ecr/registry"
+  type  = "String"
+  value = module.ecr.registry
+}
