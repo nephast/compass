@@ -9,6 +9,7 @@ export interface ApiConfig {
   documentsBucket: string;
   authMode: AuthMode;
   cognito: { userPoolId: string; clientIds: string[] } | null;
+  agentToolsUrl: string;
   rag: { topK: number; maxDistance: number };
   uploadMaxBytes: number;
 }
@@ -53,6 +54,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
               .filter(Boolean),
           }
         : null,
+    agentToolsUrl: env.AGENT_TOOLS_URL ?? "http://agent-tools.compass.svc.cluster.local",
     rag: {
       topK: num(env, "RAG_TOP_K", 5),
       maxDistance: num(env, "RAG_MAX_DISTANCE", 0.75),

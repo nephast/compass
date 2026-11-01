@@ -7,12 +7,13 @@ for goes through here, behind API Gateway's JWT authorizer.
 
 ## Routes
 
-| Method | Path                    | Auth | Does                                                                                          |
-| ------ | ----------------------- | ---- | --------------------------------------------------------------------------------------------- |
-| GET    | `/healthz`              | none | Liveness/readiness. Touches no dependency, deliberately.                                      |
-| POST   | `/documents/upload-url` | JWT  | `{fileName, size}` → presigned PUT under `uploads/<sub>/<uuid>/<name>`, size + type signed in |
-| GET    | `/documents`            | JWT  | The caller's documents with ingestion status and failure reason                               |
-| POST   | `/query`                | JWT  | `{question}` → RAG answer with numbered citations                                             |
+| Method | Path | Auth | Does |
+|---|---|---|---|
+| GET | `/healthz` | none | Liveness/readiness. Touches no dependency, deliberately. |
+| POST | `/documents/upload-url` | JWT | `{fileName, size}` → presigned PUT under `uploads/<sub>/<uuid>/<name>`, size + type signed in |
+| GET | `/documents` | JWT | The caller's documents with ingestion status and failure reason |
+| POST | `/query` | JWT | `{question}` → RAG answer with numbered citations |
+| POST | `/agent` | JWT | `{message}` → forwarded to `agent-tools` (read-only ops tools) |
 
 Errors are `{error, traceId}`. 5xx never carry internals; quote the trace id.
 
@@ -34,14 +35,15 @@ from the `rag retrieval` log line.
 
 ## Configuration
 
-| Variable                                                         | Default      |                                           |
-| ---------------------------------------------------------------- | ------------ | ----------------------------------------- |
-| `DOCUMENTS_BUCKET`                                               | —            | required                                  |
-| `AUTH_MODE`                                                      | `cognito`    | `dev` only with `LOCALSTACK_ENDPOINT` set |
-| `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID`                      | —            | required in `cognito` mode                |
-| `RAG_TOP_K` / `RAG_MAX_DISTANCE`                                 | `5` / `0.75` |                                           |
-| `DATABASE_URL` **or** `DB_HOST`+`DB_USER`+`DB_NAME`+`AWS_REGION` | —            | see `packages/pg`                         |
-| `LLM_*`                                                          | —            | see `packages/llm`                        |
+| Variable | Default | |
+|---|---|---|
+| `DOCUMENTS_BUCKET` | — | required |
+| `AUTH_MODE` | `cognito` | `dev` only with `LOCALSTACK_ENDPOINT` set |
+| `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID` | — | required in `cognito` mode |
+| `AGENT_TOOLS_URL` | `http://agent-tools.compass.svc.cluster.local` | |
+| `RAG_TOP_K` / `RAG_MAX_DISTANCE` | `5` / `0.75` | |
+| `DATABASE_URL` **or** `DB_HOST`+`DB_USER`+`DB_NAME`+`AWS_REGION` | — | see `packages/pg` |
+| `LLM_*` | — | see `packages/llm` |
 
 ## Run locally
 
