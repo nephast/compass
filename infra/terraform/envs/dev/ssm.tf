@@ -120,6 +120,37 @@ resource "aws_ssm_parameter" "eks_oidc_issuer" {
   value = module.eks.oidc_issuer
 }
 
+# --- Ingress (COMPASS-18) ----------------------------------------------------
+
+resource "aws_ssm_parameter" "ingress_listener_arn" {
+  # checkov:skip=CKV2_AWS_34:Not a secret; SecureString cannot be resolved by CDK at synth time. See header.
+  name        = "/compass/${var.env}/ingress/listener_arn"
+  description = "Internal ALB listener the API Gateway VPC Link targets"
+  type        = "String"
+  value       = module.ingress.listener_arn
+}
+
+resource "aws_ssm_parameter" "ingress_vpc_link_sg" {
+  # checkov:skip=CKV2_AWS_34:Not a secret; SecureString cannot be resolved by CDK at synth time. See header.
+  name  = "/compass/${var.env}/ingress/vpc_link_security_group_id"
+  type  = "String"
+  value = module.ingress.vpc_link_security_group_id
+}
+
+resource "aws_ssm_parameter" "ingress_alb_arn_suffix" {
+  # checkov:skip=CKV2_AWS_34:Not a secret; SecureString cannot be resolved by CDK at synth time. See header.
+  name  = "/compass/${var.env}/ingress/alb_arn_suffix"
+  type  = "String"
+  value = module.ingress.alb_arn_suffix
+}
+
+resource "aws_ssm_parameter" "ingress_tg_arn_suffix" {
+  # checkov:skip=CKV2_AWS_34:Not a secret; SecureString cannot be resolved by CDK at synth time. See header.
+  name  = "/compass/${var.env}/ingress/target_group_arn_suffix"
+  type  = "String"
+  value = module.ingress.target_group_arn_suffix
+}
+
 # --- ECR (COMPASS-7) ---------------------------------------------------------
 
 resource "aws_ssm_parameter" "ecr_registry" {
