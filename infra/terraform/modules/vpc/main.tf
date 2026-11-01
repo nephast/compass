@@ -166,7 +166,10 @@ resource "aws_default_security_group" "default" {
 # "Free Tier eligible instance types only" guardrail on, which t4g.nano
 # fails (InvalidParameterCombination on RunInstances). ADR-0001 already
 # anticipated this ("t4g.nano is ~$3/mo, or free-tier eligible depending on
-# instance type/region") — t3.micro is free-tier eligible and $0/mo here.
+# instance type/region") — t3.micro is free-tier eligible. Correction (#53):
+# on the credit-based Free Tier plan this account is on (post-July 2025),
+# "eligible" means the guardrail admits it, NOT that it is free -- it bills
+# ~$0.011/h (~$8/mo) against the credit.
 data "aws_ssm_parameter" "al2023_x86_64" {
   name = "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"
 }

@@ -89,7 +89,7 @@ The seam between them (e.g., the API service needs the VPC ID and EKS OIDC provi
 
 ## Why RDS + pgvector, not OpenSearch or a managed vector DB
 
-See `docs/adrs/0002-vector-store-choice.md`. Short version: OpenSearch Serverless has no meaningful free tier and a non-trivial cost floor; a `db.t3.micro` Postgres instance is inside the 12-month free tier, and pgvector is a real, production-used pattern (not a toy), so this teaches a transferable skill (RDS, VPC security groups, IAM DB auth) instead of a throwaway one.
+See `docs/adrs/0002-vector-store-choice.md`. Short version: OpenSearch Serverless has no meaningful free tier and a non-trivial cost floor; a `db.t3.micro` Postgres instance costs ~$17/month against the credit (the account is on the post-July-2025 credit-based Free Tier plan, which has no 12-month RDS-hours offer — #53), and pgvector is a real, production-used pattern (not a toy), so this teaches a transferable skill (RDS, VPC security groups, IAM DB auth) instead of a throwaway one.
 
 ## Why an LLM provider abstraction
 
