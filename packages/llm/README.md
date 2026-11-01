@@ -22,13 +22,33 @@ A single fused interface would assert a symmetry that does not exist, and would 
 | Variable | Values | Default |
 |---|---|---|
 | `LLM_EMBEDDING_PROVIDER` | `bedrock` \| `fake` | `bedrock` |
-| `LLM_COMPLETION_PROVIDER` | `bedrock` \| `fake` | `bedrock` |
+| `LLM_COMPLETION_PROVIDER` | `bedrock` \| `openrouter` \| `fake` | `bedrock` |
+| `OPENROUTER_API_KEY` | key | required only for `openrouter` |
 | `LLM_EMBEDDING_MODEL` | model id | `amazon.titan-embed-text-v2:0` |
 | `LLM_COMPLETION_MODEL` | inference profile id | `eu.amazon.nova-lite-v1:0` |
 
 An unrecognised provider name is an error, not a fallback: defaulting to the fake
 would let a typo in a deployed environment fill the database with meaningless
 vectors while every row count and health check stayed green.
+
+## Three interfaces
+
+`CompletionProvider` (RAG answers), `EmbeddingProvider` (ingestion + query
+embedding) and `ToolCallingProvider` (the agent loop, `src/tools.ts`). Tool
+calling is its own interface because a tool turn has a different shape — a list
+of `text` / `tool_use` / `tool_result` blocks, and the model may stop to ask for
+a tool instead of answering. `LLM_COMPLETION_PROVIDER` selects both completions
+and tool calling: one "which model answers" switch, not two.
+
+| | Bedrock | OpenRouter | Fake |
+|---|---|---|---|
+| Completions | Converse | chat/completions over `fetch` | echo |
+| Tool calling | Converse `toolConfig` | OpenAI `tools` dialect | keyword router |
+| Embeddings | Titan V2 | **refused** (ADR-0006) | hashed bag of words |
+
+OpenRouter embeddings are refused, not merely absent: a vector from another model
+is not comparable with the stored Titan vectors, so offering it as a config flag
+would make a migration look like a toggle.
 
 ## Bedrock notes
 
@@ -79,7 +99,8 @@ RUN_LIVE_LLM_TESTS=1 \
 
 The live tier is opt-in so CI neither spends money nor needs credentials.
 
-**Vendor containment check** — this must list only files under `src/bedrock/`:
+**Vendor containment check** — this must list only files under `src/bedrock/`
+(OpenRouter needs no SDK; its dialect lives only under `src/openrouter/`):
 
 ```bash
 grep -rl "@aws-sdk/client-bedrock" packages/llm/src
