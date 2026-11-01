@@ -25,3 +25,9 @@ variable "private_subnet_cidrs" {
   type        = list(string)
   default     = ["10.0.128.0/20", "10.0.144.0/20"]
 }
+
+variable "enable_interface_endpoints" {
+  description = "Create ECR/Logs/Secrets Manager interface endpoints (~$64/month). See main.tf."
+  type        = bool
+  default     = false
+}
