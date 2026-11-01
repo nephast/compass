@@ -1,7 +1,9 @@
+import { FakeCompletionProvider, FakeEmbeddingProvider } from "@compass/llm";
 import type { Pool } from "@compass/pg";
 import { describe, expect, it } from "vitest";
 import { Unauthorized, createAuthenticator } from "../../src/auth.js";
 import { loadConfig, type ApiConfig } from "../../src/config.js";
+import { buildPrompt, citedNumbers } from "../../src/rag.js";
 import { buildServer } from "../../src/server.js";
 import {
   buildUploadKey,
@@ -15,6 +17,7 @@ const config: ApiConfig = {
   documentsBucket: "docs",
   authMode: "dev",
   cognito: null,
+  rag: { topK: 5, maxDistance: 0.75 },
   uploadMaxBytes: 1000,
 };
 
@@ -23,6 +26,8 @@ function app(overrides: Partial<Parameters<typeof buildServer>[0]> = {}) {
     config,
     pool: {} as Pool,
     s3: createS3Client("http://localhost:4566"),
+    embedder: new FakeEmbeddingProvider(),
+    completer: new FakeCompletionProvider(),
     authenticate: createAuthenticator(config),
     ...overrides,
   });
@@ -76,6 +81,16 @@ describe("cognito authenticator", () => {
   });
 });
 
+describe("rag prompt", () => {
+  it("numbers passages and extracts only cited numbers", () => {
+    const prompt = buildPrompt("q?", [
+      { n: 1, documentId: "d", fileName: "a.md", ordinals: [0], text: "alpha", distance: 0.1 },
+    ]);
+    expect(prompt).toContain('[1] (from "a.md")\nalpha');
+    expect(citedNumbers("See [1] and [3][1].")).toEqual([1, 3]);
+  });
+});
+
 describe("http surface", () => {
   it("serves /healthz without auth", async () => {
     const response = await app().inject({ method: "GET", url: "/healthz" });
@@ -90,9 +105,10 @@ describe("http surface", () => {
 
   it("continues an incoming traceparent", async () => {
     const response = await app().inject({
-      method: "GET",
-      url: "/documents",
+      method: "POST",
+      url: "/query",
       headers: { traceparent: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01" },
+      payload: { question: "x" },
     });
     expect(response.json().traceId).toBe("4bf92f3577b34da6a3ce929d0e0e4736");
   });
