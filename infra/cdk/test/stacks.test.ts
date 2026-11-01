@@ -154,3 +154,17 @@ describe("ingestion (COMPASS-9..12)", () => {
     });
   });
 });
+
+describe("observability (COMPASS-29, COMPASS-30)", () => {
+  it("alarms on the four failure modes that matter", () => {
+    const names = Object.values(t("Observability").findResources("AWS::CloudWatch::Alarm")).map(
+      (a) => a.Properties.AlarmName as string,
+    );
+    expect(names.sort()).toEqual([
+      "compass-dev-api-5xx-rate",
+      "compass-dev-eks-node-not-ready",
+      "compass-dev-ingest-lambda-errors",
+      "compass-dev-ingestion-failed",
+    ]);
+  });
+});

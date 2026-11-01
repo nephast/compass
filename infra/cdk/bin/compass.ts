@@ -5,6 +5,7 @@ import { AuthStack } from "../lib/auth-stack.js";
 import { EdgeWafStack } from "../lib/edge-waf-stack.js";
 import { FrontendStack } from "../lib/frontend-stack.js";
 import { IngestionStack } from "../lib/ingestion-stack.js";
+import { ObservabilityStack } from "../lib/observability-stack.js";
 import { SiteStack } from "../lib/site-stack.js";
 
 // COMPASS-8 on the CDK side: every IAM role in every stack -- including the
@@ -70,6 +71,18 @@ export function buildApp(props: AppProps = {}): App {
       authDomain: `${auth.domain.domainName}.auth.${region}.amazoncognito.com`,
       env: envName,
     },
+  });
+
+  new ObservabilityStack(app, `${prefix}-Observability`, {
+    env,
+    envName,
+    httpApi: api.httpApi,
+    apiAccessLogs: api.accessLogs,
+    stateMachine: ingestion.stateMachine,
+    ingestFunction: ingestion.ingestFunction,
+    ingestLogGroup: ingestion.ingestLogGroup,
+    alertEmail:
+      (app.node.tryGetContext("alertEmail") as string | undefined) ?? process.env.ALERT_EMAIL,
   });
 
   Aspects.of(app).add(new BoundaryOnRawRoles());
