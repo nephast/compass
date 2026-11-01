@@ -42,7 +42,7 @@ function tokenize(text: string): string[] {
 export class FakeEmbeddingProvider implements EmbeddingProvider {
   readonly dimensions = EMBEDDING_DIMENSIONS;
 
-  constructor(private readonly model: string = FAKE_EMBEDDING_MODEL) {}
+  constructor(readonly model: string = FAKE_EMBEDDING_MODEL) {}
 
   // `async` deliberately: a synchronous throw here would diverge from the
   // Bedrock adapter, where the same guard surfaces as a rejected promise.

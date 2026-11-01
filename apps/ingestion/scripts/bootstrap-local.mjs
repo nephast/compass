@@ -1,10 +1,14 @@
 // Creates the local dev bucket in LocalStack. Idempotent -- safe to run on
 // every `npm run local:up`. Plain .mjs so it needs no build step.
 //
-// Only S3 lives here: the chunks table is created on demand by src/db.ts
-// (a COMPASS-14 stand-in), and keeping one owner of the schema beats having
-// a bootstrap script and the app disagree about it.
-import { S3Client, CreateBucketCommand, HeadBucketCommand } from "@aws-sdk/client-s3";
+// Only S3 lives here: the schema is owned by apps/db's migrations, which
+// `npm run local:up` runs first.
+import {
+  S3Client,
+  CreateBucketCommand,
+  HeadBucketCommand,
+  PutBucketCorsCommand,
+} from "@aws-sdk/client-s3";
 
 if (process.env.NODE_ENV !== "production") {
   try {
@@ -32,3 +36,22 @@ try {
   await s3.send(new CreateBucketCommand({ Bucket: bucket }));
   console.log(`created bucket: ${bucket}`);
 }
+
+// The browser PUTs straight to the bucket with a presigned URL (COMPASS-9), so
+// the local bucket needs the same CORS rule CDK puts on the real one.
+await s3.send(
+  new PutBucketCorsCommand({
+    Bucket: bucket,
+    CORSConfiguration: {
+      CORSRules: [
+        {
+          AllowedMethods: ["PUT"],
+          AllowedOrigins: ["http://localhost:3000"],
+          AllowedHeaders: ["content-type", "content-length"],
+          MaxAgeSeconds: 3000,
+        },
+      ],
+    },
+  }),
+);
+console.log(`cors set on ${bucket} for http://localhost:3000`);

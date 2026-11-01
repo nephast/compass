@@ -64,7 +64,9 @@ export async function deployHandler(functionName: string): Promise<string> {
       Handler: "on-object-created.handler",
       Code: { ZipFile },
       Timeout: 10,
-      Environment: { Variables: { DATABASE_URL: LAMBDA_DATABASE_URL } },
+      Environment: {
+        Variables: { DATABASE_URL: LAMBDA_DATABASE_URL, LLM_EMBEDDING_PROVIDER: "fake" },
+      },
     }),
   );
 

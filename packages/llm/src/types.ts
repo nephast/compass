@@ -26,6 +26,12 @@ export interface EmbeddingResult {
 
 export interface EmbeddingProvider {
   readonly dimensions: number;
+  /**
+   * The model this provider is configured to request. Used to ask "is this
+   * chunk already embedded with the current model" before spending a call;
+   * provenance on stored rows still comes from EmbeddingResult.model.
+   */
+  readonly model: string;
   /** Vectors are returned in the same order as `texts`. */
   embed(texts: string[]): Promise<EmbeddingResult>;
 }

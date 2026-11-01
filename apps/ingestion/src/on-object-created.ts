@@ -1,18 +1,27 @@
-import type { S3Handler } from "aws-lambda";
-import { getObjectText } from "./s3-objects.js";
-import { storeObjectAsChunk } from "./chunk-store.js";
-import { parseS3Records } from "./s3-events.js";
+import { embeddingProviderFromEnv } from "@compass/llm";
+import { createPool } from "@compass/pg";
+import { ingestObject, type IngestResult } from "./ingest.js";
 import { logger } from "./logger.js";
+import { getObject } from "./s3-objects.js";
+import { parseIngestEvent } from "./s3-events.js";
 
-// TODO (COMPASS-11): replace with real chunking + embeddings. For now this
-// proves S3 -> Lambda -> pgvector end-to-end with a placeholder embedding.
-export const handler: S3Handler = async (event) => {
-  for (const { bucket, key } of parseS3Records(event)) {
+// Created once per execution environment and reused across invocations --
+// the same container-reuse pattern as the S3 client. max: 2 because one
+// invocation handles one document at a time; the pool exists for reconnects.
+const deps = {
+  pool: createPool(process.env, { max: 2 }),
+  embedder: embeddingProviderFromEnv(),
+  fetchObject: getObject,
+};
+
+export const handler = async (event: unknown): Promise<IngestResult[]> => {
+  const results: IngestResult[] = [];
+  for (const { bucket, key } of parseIngestEvent(event)) {
     logger.info("object created", { bucket, key });
-
-    const content = await getObjectText(bucket, key);
-    await storeObjectAsChunk(bucket, key, content);
-
-    logger.info("chunk stored", { bucket, key, bytes: content.length });
+    results.push(await ingestObject(deps, bucket, key));
   }
+  // Returned so the Step Functions execution history shows the outcome per
+  // document -- "duplicate" and "failed" are both successful executions, and
+  // without this the console would show them identically.
+  return results;
 };
