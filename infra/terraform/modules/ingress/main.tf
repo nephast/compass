@@ -40,6 +40,7 @@ resource "aws_security_group" "alb" {
 }
 
 resource "aws_vpc_security_group_ingress_rule" "alb_from_vpc_link" {
+  # checkov:skip=CKV_AWS_260:False positive: the source is the VPC Link security group, not 0.0.0.0/0.
   security_group_id            = aws_security_group.alb.id
   description                  = "HTTP from the API Gateway VPC Link only"
   ip_protocol                  = "tcp"
@@ -60,6 +61,7 @@ resource "aws_vpc_security_group_egress_rule" "alb_to_nodes" {
 # Attach point for the nodes (passed to modules/eks): admits the ALB on the
 # NodePort and nothing else.
 resource "aws_security_group" "targets" {
+  # checkov:skip=CKV2_AWS_5:Attached to the EKS nodes via modules/eks's launch template, outside this module.
   name_prefix = "compass-${var.env}-ingress-targets-"
   description = "Nodes reachable from the internal ALB on the api NodePort"
   vpc_id      = var.vpc_id
@@ -81,6 +83,7 @@ resource "aws_vpc_security_group_ingress_rule" "targets_from_alb" {
 resource "aws_lb" "internal" {
   # checkov:skip=CKV_AWS_91:ALB access logs need a log bucket and bill per GB; API Gateway access logs (CDK) already record every request that can reach this internal ALB.
   # checkov:skip=CKV_AWS_150:Deletion protection off so teardown completes in one pass.
+  # checkov:skip=CKV2_AWS_20:No HTTPS listener exists to redirect to; internal hop, see the listener comment.
   # checkov:skip=CKV2_AWS_28:WAF sits at the edge (CloudFront); this ALB is internal and reachable only from the VPC Link SG.
   name                       = "compass-${var.env}-internal"
   internal                   = true
@@ -92,6 +95,7 @@ resource "aws_lb" "internal" {
 }
 
 resource "aws_lb_target_group" "api" {
+  # checkov:skip=CKV_AWS_378:Internal hop behind API Gateway's TLS; see the listener comment.
   name        = "compass-${var.env}-api"
   port        = var.node_port
   protocol    = "HTTP"
@@ -130,6 +134,7 @@ resource "aws_lb_listener" "http" {
 }
 
 resource "aws_autoscaling_attachment" "api" {
+  # checkov:skip=CKV2_AWS_15:The ASG is owned by the EKS managed node group, which manages node health itself; ELB health checks would let a pod-level failure terminate a healthy node.
   count                  = var.node_group_asg_name == null ? 0 : 1
   autoscaling_group_name = var.node_group_asg_name
   lb_target_group_arn    = aws_lb_target_group.api.arn

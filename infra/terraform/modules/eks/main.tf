@@ -40,8 +40,28 @@ resource "aws_iam_role_policy_attachment" "cluster" {
 # without it, a Secret is base64 in the control plane's storage. Compass keeps
 # its real secrets in Secrets Manager, so this is defence in depth -- cheap
 # enough to not argue about (CKV_AWS_58).
+data "aws_caller_identity" "current" {}
+
+# The default key policy, stated explicitly (CKV2_AWS_64): the account's IAM
+# policies decide who may use the key. EKS uses it through the cluster role.
+data "aws_iam_policy_document" "secrets_key" {
+  # checkov:skip=CKV_AWS_109:This is AWS's default key policy: delegate to the account's IAM policies. "*" in a key policy means "this key".
+  # checkov:skip=CKV_AWS_111:As above.
+  # checkov:skip=CKV_AWS_356:As above.
+  statement {
+    sid       = "AccountIamDecides"
+    actions   = ["kms:*"]
+    resources = ["*"]
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:${local.partition}:iam::${data.aws_caller_identity.current.account_id}:root"]
+    }
+  }
+}
+
 resource "aws_kms_key" "secrets" {
   description             = "${local.name} EKS secrets envelope encryption"
+  policy                  = data.aws_iam_policy_document.secrets_key.json
   enable_key_rotation     = true
   deletion_window_in_days = 7
 }
@@ -59,6 +79,7 @@ resource "aws_cloudwatch_log_group" "cluster" {
 resource "aws_eks_cluster" "main" {
   # checkov:skip=CKV_AWS_39:Public endpoint kept so kubectl and CI work without a VPN or bastion; restricted by var.public_access_cidrs and IAM. Private endpoint is also on, so nodes never leave the VPC to reach it.
   # checkov:skip=CKV_AWS_38:See CKV_AWS_39 -- the CIDR list is variable, default documented in variables.tf.
+  # checkov:skip=CKV_AWS_339:checkov's supported-version list lags EKS releases; var.kubernetes_version is chosen against `aws eks describe-cluster-versions` (see variables.tf).
   # checkov:skip=CKV_AWS_37:Only audit + authenticator logs enabled, deliberately (cost); see the log group above.
   name     = local.name
   version  = var.kubernetes_version

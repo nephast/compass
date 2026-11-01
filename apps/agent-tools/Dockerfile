@@ -23,8 +23,12 @@ FROM node:24-alpine AS runtime
 ENV NODE_ENV=production \
     SERVICE_NAME=agent-tools
 WORKDIR /app
-# npm and corepack are not needed at runtime and carry their own CVE surface.
-RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+# Patch the base image's OS packages at build time (Trivy gates fixable
+# HIGH/CRITICAL findings, COMPASS-25), and drop npm and corepack, which are not
+# needed at runtime and carry their own CVE surface.
+RUN --mount=type=secret,id=extra_ca,required=false \
+    SSL_CERT_FILE=$([ -f /run/secrets/extra_ca ] && echo /run/secrets/extra_ca || echo /etc/ssl/certs/ca-certificates.crt) \
+    apk upgrade --no-cache && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
     /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
 COPY --from=build --chown=node:node /repo/apps/agent-tools/dist/main.mjs ./main.mjs
 # The image's built-in unprivileged user (uid 1000). The Deployment also sets

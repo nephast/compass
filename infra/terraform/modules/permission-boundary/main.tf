@@ -18,6 +18,17 @@ locals {
 }
 
 data "aws_iam_policy_document" "boundary" {
+  # A boundary is a CEILING, not a grant: these checks read the broad Allow as
+  # if it were attached to a principal. Effective permissions are the
+  # intersection with each role's own (least-privilege) policy, and the Deny
+  # statements below are what close escalation. Reviewed in COMPASS-33.
+  # checkov:skip=CKV_AWS_107:Ceiling, not a grant; see above.
+  # checkov:skip=CKV_AWS_108:Ceiling, not a grant; see above.
+  # checkov:skip=CKV_AWS_109:Ceiling, not a grant; see above.
+  # checkov:skip=CKV_AWS_110:Escalation paths are closed by the explicit Deny statements in this document.
+  # checkov:skip=CKV_AWS_111:Ceiling, not a grant; see above.
+  # checkov:skip=CKV_AWS_356:Ceiling, not a grant; see above.
+  # checkov:skip=CKV2_AWS_40:iam:* is in the ceiling so bounded roles can manage bounded roles; the Denies forbid unbounded ones.
   # tfsec:ignore:aws-iam-no-policy-wildcards
   statement {
     sid    = "ServicesCompassUses"

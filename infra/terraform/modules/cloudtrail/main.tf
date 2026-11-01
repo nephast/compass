@@ -40,6 +40,7 @@ locals {
 resource "aws_s3_bucket" "trail" {
   # checkov:skip=CKV_AWS_18:Access logging on the audit bucket would need a second bucket to receive it, which would itself want access logging. The trail's own log-file validation digests cover tamper-detection here.
   # checkov:skip=CKV_AWS_144:Cross-region replication is a multi-account/DR control; this is a single-account portfolio project on a fixed credit. Noted as a scaling seam in ADR-0005.
+  # checkov:skip=CKV2_AWS_62:No consumer for object-created events on the audit bucket; tampering is detected at the API level (#55).
   # checkov:skip=CKV_AWS_145:SSE-S3 over SSE-KMS is a deliberate cost decision argued in ADR-0005 — a CMK bills per request and needs its own key policy for CloudTrail.
   bucket = local.bucket_name
 
@@ -216,6 +217,8 @@ resource "aws_s3_bucket_policy" "trail" {
 
 resource "aws_cloudtrail" "main" {
   # checkov:skip=CKV_AWS_35:SSE-S3 over SSE-KMS is a deliberate cost decision argued in ADR-0005.
+  # checkov:skip=CKV_AWS_252:Per-log-file SNS notifications would be noise; tamper detection is the EventBridge rule below (#55).
+  # checkov:skip=CKV2_AWS_10:CloudWatch Logs delivery bills per GB ingested; the EventBridge rule below covers the one real-time signal needed (tampering).
   name           = var.trail_name
   s3_bucket_name = aws_s3_bucket.trail.id
 

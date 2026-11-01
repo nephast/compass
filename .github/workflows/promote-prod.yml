@@ -1,10 +1,17 @@
 name: Promote to prod
 
-# Manually triggered only, and gated behind the "prod" GitHub Environment's
-# required reviewers (configure this in repo Settings → Environments once
-# you're ready for it — part of COMPASS-27). Deploys a specific, already-
-# built image tag from dev to prod. Nothing here builds new artifacts —
-# promotion means running the exact thing that passed in dev, not rebuilding.
+# COMPASS-27. Manually triggered only, and gated behind the "prod" GitHub
+# Environment's required reviewers: the job -- and therefore its OIDC token,
+# which the deploy role's trust policy only accepts for environment:prod --
+# does not exist until someone clicks Approve. "prod never changes without
+# an explicit click" is enforced by GitHub and IAM, not by convention.
+#
+# Promotion re-deploys a SHA dev already ran. Nothing is rebuilt: the image
+# in ECR is immutable, so prod runs the exact bytes that passed the dev smoke
+# test.
+#
+# A prod environment does not exist yet (cost: a second EKS control plane).
+# vars.PROD_ENABLED keeps this a no-op until it does; see docs/runbooks/deploy.md.
 
 on:
   workflow_dispatch:
@@ -22,23 +29,17 @@ jobs:
   promote:
     name: Deploy verified image to prod
     runs-on: ubuntu-latest
-    if: false # TODO: flip on once dev is stable and you're ready to stand up a second env
-    environment: prod # requires manual approval — configure required reviewers on this environment
+    if: vars.PROD_ENABLED == 'true'
+    environment: prod # required reviewers configured on this environment
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Refuse anything that is not a full commit SHA
+        run: '[[ "${{ inputs.image_tag }}" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::image_tag must be a 40-char git SHA"; exit 1; }'
       - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # SHA for v4.3.1
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           role-to-assume: ${{ secrets.AWS_CI_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
-      - run: aws eks update-kubeconfig --name compass-prod --region ${{ vars.AWS_REGION }}
-      - name: Roll out the already-verified image
-        run: |
-          kubectl set image deployment/api api=$ECR_REGISTRY/compass-api:${{ inputs.image_tag }} -n compass
-          kubectl set image deployment/agent-tools agent-tools=$ECR_REGISTRY/compass-agent-tools:${{ inputs.image_tag }} -n compass
-          kubectl rollout status deployment/api -n compass --timeout=120s
-          kubectl rollout status deployment/agent-tools -n compass --timeout=120s
-        env:
-          ECR_REGISTRY: ${{ vars.ECR_REGISTRY }}
-      - name: Smoke test prod
-        run: ./scripts/smoke-test.sh prod
+      - uses: azure/setup-kubectl@776406bce94f63e41d621b960d78ee25c8b76ede # v4.0.1
+      - run: scripts/k8s-deploy.sh prod ${{ inputs.image_tag }}
+      - run: scripts/smoke-test.sh prod

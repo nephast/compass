@@ -52,8 +52,8 @@ Hybrid by design (see `docs/ARCHITECTURE.md` for the diagram and the reasoning):
 - **Definition of done** (per `docs/PROGRAM.md`): merged via small PR, CI green, and — where a decision is worth defending — a new ADR in `docs/adrs/` (use `0000-template.md`) or an update to `docs/ARCHITECTURE.md` / `docs/SCALING.md`.
 - Prettier: double quotes, semicolons, trailing commas, 100 cols. TS is `strict` plus `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` (`tsconfig.base.json`) — workspaces should extend it. ESLint flags `no-console` (allows `warn`/`error`) and warns on `any`.
 - Structured JSON logging and trace propagation are meant to be written in from day one (COMPASS-29/31), not retrofitted.
-- Third-party GitHub Actions are **SHA-pinned** with a version comment; keep that pattern when adding steps. AWS auth in CI is OIDC (`id-token: write`) — no static keys.
-- Many CI jobs are gated behind `if: false` with a `TODO (COMPASS-N)` comment; flip them on in the PR that makes them meaningful, rather than leaving them permanently off.
+- **Every** GitHub Action — third-party and `actions/*` alike — is pinned to a full 40-char commit SHA with a `# vX.Y.Z` comment (#59, option a). Check with `grep -rn "uses:" .github/workflows/ | grep -vE "@[0-9a-f]{40}"` (must print nothing). AWS auth in CI is OIDC (`id-token: write`) — no static keys. AWS-touching jobs carry a fork guard and are gated on the `AWS_CI_ENABLED` repository variable.
+- CI gates are binding: no `continue-on-error` on lint, tests, `npm audit`, Trivy, tfsec or checkov. A deliberate checkov finding is suppressed inline with `# checkov:skip=<ID>:<reason>`, never by loosening the job. Transitive vulnerability fixes go in the root `package.json` `overrides`.
 
 ## Cost discipline
 
