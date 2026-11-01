@@ -2,6 +2,7 @@
 # balancers; private subnets hold EKS nodes and RDS, and never get public IPs.
 
 resource "aws_vpc" "main" {
+  # checkov:skip=CKV2_AWS_11:VPC flow logs bill per GB ingested into CloudWatch; nothing here needs packet-level forensics on a dev VPC torn down nightly. First thing to add for anything long-lived (docs/SCALING.md).
   cidr_block = var.vpc_cidr
 
   # Both required for EKS: nodes register in the cluster by private DNS name,
@@ -28,6 +29,7 @@ resource "aws_internet_gateway" "main" {
 # --- Subnets -----------------------------------------------------------------
 
 resource "aws_subnet" "public_a" {
+  # checkov:skip=CKV_AWS_130:Public subnet by design: the NAT instance needs a public address. Private subnets keep the flag off (the COMPASS-5 acceptance check).
   vpc_id            = aws_vpc.main.id
   cidr_block        = var.public_subnet_cidrs[0]
   availability_zone = var.azs[0]
@@ -46,6 +48,7 @@ resource "aws_subnet" "public_a" {
 }
 
 resource "aws_subnet" "public_b" {
+  # checkov:skip=CKV_AWS_130:Public subnet by design, as public_a.
   vpc_id            = aws_vpc.main.id
   cidr_block        = var.public_subnet_cidrs[1]
   availability_zone = var.azs[1]
@@ -149,6 +152,13 @@ resource "aws_route_table_association" "private_b" {
   route_table_id = aws_route_table.private_b.id
 }
 
+# The VPC's default security group, emptied (CKV2_AWS_12). Anything launched
+# without an explicit group lands in it; with no rules it can talk to nothing,
+# so a forgotten security group fails closed instead of open.
+resource "aws_default_security_group" "default" {
+  vpc_id = aws_vpc.main.id
+}
+
 # --- NAT instance ------------------------------------------------------------
 
 # Resolved from AWS's published parameter, never hardcoded — AMI IDs rotate
@@ -162,14 +172,18 @@ data "aws_ssm_parameter" "al2023_x86_64" {
 }
 
 resource "aws_security_group" "nat" {
-  vpc_id = aws_vpc.main.id
+  # checkov:skip=CKV_AWS_382:A NAT forwards private-subnet traffic to arbitrary internet destinations; unrestricted egress is its function.
+  vpc_id      = aws_vpc.main.id
+  description = "NAT instance: forward traffic from the private subnets"
   ingress {
+    description = "Anything from the private subnets, to be forwarded"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = var.private_subnet_cidrs
   }
   egress {
+    description = "Forwarded traffic to the internet"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -179,6 +193,8 @@ resource "aws_security_group" "nat" {
 }
 
 resource "aws_instance" "nat" {
+  # checkov:skip=CKV_AWS_126:Detailed (1-minute) monitoring bills per metric; 5-minute basic monitoring is enough to see a dead NAT.
+  # checkov:skip=CKV2_AWS_41:The NAT instance calls no AWS API, so it gets no instance profile -- one fewer credential on a public-facing host.
   ami                    = data.aws_ssm_parameter.al2023_x86_64.value
   instance_type          = "t3.micro"
   subnet_id              = aws_subnet.public_a.id
@@ -188,6 +204,15 @@ resource "aws_instance" "nat" {
   # instance. AWS drops that traffic by default as an anti-spoofing measure;
   # this opts the instance out of that check.
   source_dest_check = false
+
+  ebs_optimized = true
+
+  # Encrypted root volume (CKV_AWS_8). Changing this replaces the instance on
+  # the next apply -- harmless at this project's teardown cadence.
+  root_block_device {
+    encrypted   = true
+    volume_type = "gp3"
+  }
 
   # Refuse the unauthenticated IMDSv1 path (plain GET to 169.254.169.254);
   # require a session token first.
