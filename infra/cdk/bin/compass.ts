@@ -1,0 +1,47 @@
+import { App, Aspects, Tags, type AppProps } from "aws-cdk-lib";
+import { BOUNDARY_NAME, BoundaryOnRawRoles } from "../lib/boundary.js";
+import { IngestionStack } from "../lib/ingestion-stack.js";
+
+// COMPASS-8 on the CDK side: every IAM role in every stack -- including the
+// ones CDK creates for its own custom resources (bucket auto-delete,
+// BucketDeployment) -- carries the account's permissions boundary, owned by
+// envs/account in Terraform. Set at the App level by NAME, via CDK's
+// permissionsBoundary context key, and a name carries no account id; the
+// BoundaryOnRawRoles aspect covers the provider roles that key misses.
+// test/stacks.test.ts asserts no role escapes it.
+export function buildApp(props: AppProps = {}): App {
+  const app = new App({
+    ...props,
+    context: {
+      ...props.context,
+      "@aws-cdk/core:permissionsBoundary": { name: BOUNDARY_NAME },
+      // Strong exports: CloudFormation refuses to delete a value another stack
+      // still imports. Explicit, so tests and the CLI behave the same.
+      "@aws-cdk/core:defaultCrossStackReferences": "strong",
+    },
+  });
+  // One stack set per environment: `cdk deploy --all --context env=dev`.
+  const envName = (app.node.tryGetContext("env") as string | undefined) ?? "dev";
+  if (!/^[a-z]+$/.test(envName)) throw new Error(`invalid env "${envName}"`);
+
+  const account = process.env.CDK_DEFAULT_ACCOUNT;
+  const region = process.env.CDK_DEFAULT_REGION ?? "eu-west-1";
+  const env = { account, region };
+  const prefix = `Compass-${envName}`;
+
+  // The browser origins allowed to PUT straight to the documents bucket. The
+  // CloudFront URL joins this list when the frontend stack exists (COMPASS-24).
+  const corsOrigins = ["http://localhost:3000"];
+
+  new IngestionStack(app, `${prefix}-Ingestion`, { env, envName, corsOrigins });
+
+  Aspects.of(app).add(new BoundaryOnRawRoles());
+
+  // Cost allocation tags on every taggable resource (COMPASS-37).
+  Tags.of(app).add("Project", "compass");
+  Tags.of(app).add("Environment", envName);
+  Tags.of(app).add("ManagedBy", "cdk");
+  return app;
+}
+
+if (process.argv[1]?.endsWith("compass.ts")) buildApp().synth();

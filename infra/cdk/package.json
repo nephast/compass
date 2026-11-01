@@ -1,0 +1,23 @@
+{
+  "name": "@compass/cdk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "eslint bin lib test",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "synth": "cdk synth --context env=dev --quiet",
+    "cdk": "cdk"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.200.0",
+    "constructs": "^10.4.0"
+  },
+  "devDependencies": {
+    "aws-cdk": "^2.1000.0",
+    "esbuild": "^0.28.0",
+    "tsx": "^4.19.0",
+    "vitest": "^4.1.0"
+  }
+}
