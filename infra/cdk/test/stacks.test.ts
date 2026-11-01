@@ -1,0 +1,80 @@
+import { Stack } from "aws-cdk-lib";
+import { Match, Template } from "aws-cdk-lib/assertions";
+import { beforeAll, describe, expect, it } from "vitest";
+import { buildApp } from "../bin/compass.js";
+
+// Offline synth of the whole app (no credentials: every platform value is a
+// deploy-time SSM parameter), then assertions on the properties that would
+// be security or cost incidents if they regressed.
+
+let templates: Map<string, Template>;
+let raw: Map<string, string>;
+
+beforeAll(() => {
+  const app = buildApp({ context: { env: "dev" } });
+  const assembly = app.synth();
+  templates = new Map();
+  raw = new Map();
+  for (const stack of app.node.children.filter((c): c is Stack => c instanceof Stack)) {
+    templates.set(stack.stackName, Template.fromStack(stack));
+    raw.set(stack.stackName, JSON.stringify(assembly.getStackByName(stack.stackName).template));
+  }
+});
+
+const t = (name: string) => {
+  const template = templates.get(`Compass-dev-${name}`);
+  if (!template) throw new Error(`no stack ${name}`);
+  return template;
+};
+
+describe("account hygiene", () => {
+  it("every IAM role in every stack carries the permissions boundary (COMPASS-8)", () => {
+    let roles = 0;
+    for (const [name, template] of templates) {
+      for (const [logicalId, role] of Object.entries(template.findResources("AWS::IAM::Role"))) {
+        roles += 1;
+        expect(role.Properties?.PermissionsBoundary, `${name}/${logicalId}`).toBeDefined();
+      }
+    }
+    expect(roles).toBeGreaterThan(3);
+  });
+
+  it("no template contains a literal 12-digit account id (public repo)", () => {
+    for (const [name, json] of raw) {
+      // Alphanumeric boundaries: asset hashes are hex and can contain twelve
+      // digits in a row without being an account id.
+      expect(json, name).not.toMatch(/(?<![0-9A-Za-z])[0-9]{12}(?![0-9A-Za-z])/);
+    }
+  });
+
+  it("tags taggable resources for the cost report (COMPASS-37)", () => {
+    t("Ingestion").hasResourceProperties("AWS::S3::Bucket", {
+      Tags: Match.arrayWith([
+        { Key: "Environment", Value: "dev" },
+        { Key: "ManagedBy", Value: "cdk" },
+        { Key: "Project", Value: "compass" },
+      ]),
+    });
+  });
+});
+
+describe("ingestion (COMPASS-9..12)", () => {
+  it("routes only uploads/ ObjectCreated events to the state machine", () => {
+    t("Ingestion").hasResourceProperties("AWS::Events::Rule", {
+      EventPattern: Match.objectLike({
+        "detail-type": ["Object Created"],
+        detail: Match.objectLike({ object: { key: [{ prefix: "uploads/" }] } }),
+      }),
+    });
+  });
+
+  it("runs the Lambda in the VPC with bounded concurrency and verify-full TLS", () => {
+    t("Ingestion").hasResourceProperties("AWS::Lambda::Function", {
+      VpcConfig: Match.objectLike({ SubnetIds: Match.anyValue() }),
+      ReservedConcurrentExecutions: 5,
+      Environment: {
+        Variables: Match.objectLike({ DB_SSL_ROOT_CERT: "/var/runtime/ca-cert.pem" }),
+      },
+    });
+  });
+});

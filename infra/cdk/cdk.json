@@ -1,0 +1,7 @@
+{
+  "app": "npx tsx bin/compass.ts",
+  "watch": { "include": ["bin/**", "lib/**"] },
+  "context": {
+    "@aws-cdk/core:defaultCrossStackReferences": "strong"
+  }
+}
