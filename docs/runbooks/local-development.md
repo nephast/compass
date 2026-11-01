@@ -22,6 +22,17 @@ idempotent — re-run it whenever you want.
 Tear it down with `npm run local:down` (add `-v` to `docker compose down`
 yourself if you want the Postgres volume gone too).
 
+## The whole product, offline
+
+```bash
+scripts/dev-stack.sh     # then open http://localhost:3000
+```
+
+Starts LocalStack + pgvector, migrates, then runs the api (`:8080`, dev auth),
+agent-tools (`:8081`), an ingestion watcher (polls the LocalStack bucket and runs the
+real ingest function, standing in for EventBridge → Step Functions) and the Next.js
+dev server. LLMs default to the offline fakes. Ctrl-C stops everything.
+
 ## The loop
 
 ```bash
